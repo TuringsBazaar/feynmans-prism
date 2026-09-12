@@ -1,0 +1,148 @@
+Establish effective methodologies to improve, scale, and rigorously test the capabilities of biologically plausible credit assignment algorithms, including predictive coding, contrastive Hebbian learning, and forward-only learning, and develop experimental protocols to empirically verify the specific claims these algorithms imply about cortical processing.
+Paper has 32 X likes
+Sep 10, 2026
+Establish the subspace conditional Poincaré inequality for general finite-rank orthogonal projectors under infinite-dimensional uniform product measures, thereby converting active-subspace tail-energy bounds for affine uniform elliptic PDEs into ridge-reconstruction error bounds.
+Paper has 0 X likes
+Sep 10, 2026
+Determine how to predict, from the original noisy data, the information processing capacity that will result after applying noise-reduction strategies such as averaging repeated state traces.
+Paper has 0 X likes
+Sep 10, 2026
+Determine rigorous signal detection thresholds for spiked models as a function of data type; specifically, establish precise detectability conditions for low-rank signals embedded in high-dimensional noise for spiked matrix and spiked tensor settings.
+Paper has 0 X likes
+Sep 10, 2026
+Establish whether the original temporal mutual-information analysis of degeneracy can be applied to neuromechanical models that exhibit a stationary regime.
+Paper has 0 X likes
+Sep 10, 2026
+Determine whether the distribution of degeneracy and redundancy proposed for a single-joint, two-muscle neuromechanical system holds in multi-joint systems with biarticular muscles and coordinated force feedback.
+Paper has 0 X likes
+Sep 10, 2026
+Determine whether quantum mechanics should be regarded as an effective theory that will ultimately be superseded by a more fundamental physical theory.
+Paper has 14 X likes
+Sep 09, 2026
+Determine whether all physical systems and phenomena are fundamentally quantum mechanical in nature, establishing whether quantum mechanics provides a universal description with no exceptions.
+Paper has 12 X likes
+Sep 09, 2026
+Develop approaches that accurately capture the global nonlinear behavior of dynamical systems beyond local models near fixed points, addressing the inability of local linearizations to represent global dynamics in complex systems.
+Paper has 4 X likes
+Sep 09, 2026
+Develop reliable methods to predict the southward component (Bz) of the interplanetary magnetic field embedded in Earth-directed coronal mass ejections prior to their arrival at Earth, in order to enable accurate forecasting of geomagnetic storm intensity (the "Bz problem").
+Paper has 1 X likes
+Sep 09, 2026
+Investigate conditions under which the Jacobian matrix J_φ(x) = [∂(P_N φ_{λ_i})/∂x_j](x) is invertible on a domain D, thereby ensuring that the surrogate vector field \widetilde{F}(x) = J_φ(x)^{-1} [λ_1 P_N φ_{λ_1}(x), …, λ_n P_N φ_{λ_n}(x)]^T is well-defined and can be used to provide stability guarantees based on the truncated Koopman eigenfunctions.
+Paper has 0 X likes
+Sep 09, 2026
+Characterize partial collapses of subsets of agents under entropy-regularized semi-discrete optimal-transport coverage control and develop conditions or mechanisms that enforce collision-free trajectories.
+Paper has 0 X likes
+Sep 09, 2026
+Verify the reliability of the passive safety features incorporated into small modular reactors intended for remote Arctic energy systems, thereby establishing whether these reactors can be approved for deployment.
+Paper has 0 X likes
+Sep 09, 2026
+Determine what physical mechanism selects whether the common magnetic-helicity cascade is realized as a power-law magnetic spectrum with index -3/4 or as a stretched-exponential distributed-chaos spectrum with exponent 1/5 in a given solar-wind or outer-heliosheath situation.
+Paper has 0 X likes
+Sep 09, 2026
+Determine whether large language model (LLM)-based agents that can solve a specific networking problem within a particular network topology perform equally well when the problem instance, the location in the network, or the topology itself changes in real-world deployments. This aims to assess the robustness and generalization capabilities of LLM agents beyond static, manually curated benchmarks in network operations.
+Paper has 11 X likes
+Sep 08, 2026
+Establish a common direction-dependent intrinsic cross-polarisation ratio benchmark across radio-telescope facilities using metric-, frequency-, and calibration-matched comparisons.
+Paper has 0 X likes
+Sep 08, 2026
+Determine whether large language models reason in a genuinely human-like manner.
+Paper has 602 X likes
+Sep 04, 2026
+Determine whether dynamical symmetry (equivariance) is relevant to other forms of emergence that focus on enhanced controllability (e.g., causal emergence) and on whole–part relationships, beyond the hierarchical emergence mechanism established via symmetry-induced informational closure.
+Paper has 208 X likes
+Sep 04, 2026
+Investigate the applicability of the online Lipschitz-smoothness estimator L_{t+1} = max(L_t, c_{t+1}) used within the NAG-free heuristic to optimization problems outside the strongly convex setting, and ascertain domains where this estimator provides practical benefits.
+Paper has 144 X likes
+Sep 04, 2026
+Determine the extent to which the reported phase behavior of neural-network–derived multi-layer Ising spin systems—specifically, the monotonic and often power-law growth of the melting transition temperature T_c with training and the rapid replacement of the spin-glass transition by a hidden-order phase with a single Z2 symmetry-broken TAP solution—persists for neural networks beyond the studied feed-forward architectures trained on MNIST, including different network architectures, datasets, and tasks.
+Paper has 114 X likes
+Sep 04, 2026
+Determine whether alternative metrics for comparing neural representations between systems can, on their own, address the challenges posed by representation biases in learned feature representations that distort cross-system comparisons.
+Paper has 80 X likes
+Sep 04, 2026
+Determine which learning processes generate representational drift while preserving memory and behavior in biological or artificial learning systems.
+Paper has 74 X likes
+Sep 04, 2026
+Determine the role of network topology in the non-equilibrium dynamics of complex systems, specifically identifying how structural features of directed networks affect violations of detailed balance and entropy production across stochastic dynamical processes.
+Paper has 39 X likes
+Sep 04, 2026
+Ascertain the feasibility of deploying quantum‑resistant cryptographic protocols on resource‑constrained satellite platforms used in integrated terrestrial–non‑terrestrial networks, including evaluation of algorithmic complexity, performance overhead, and energy usage under in‑orbit operating conditions.
+Paper has 25 X likes
+Sep 04, 2026
+Develop continuous‑time reinforcement learning frameworks and theoretical guarantees for mean–variance portfolio selection by large investors whose trading actions impact asset prices and factors, addressing the challenge that counterfactual wealth trajectories under alternative portfolios cannot be inferred from observed price paths due to endogenous price impact.
+Paper has 10 X likes
+Sep 04, 2026
+Develop theoretically grounded schedules for the input corruption noise level over training time and for data augmentation—specifically, the number of independent noisy realizations per clean input—when training denoising autoencoders, with the objective of minimizing the final mean squared reconstruction error at a specified test noise level.
+Paper has 10 X likes
+Sep 04, 2026
+Develop self-supervised pre-training objectives and procedures—such as next-sample prediction, masking, and denoising—for a physical-layer wireless foundation model that can effectively support multiple downstream wireless tasks with heterogeneous data representations, enabling efficient fine-tuning with minimal additional data across varied telecom applications.
+Paper has 4 X likes
+Sep 04, 2026
+Develop and validate a joint selection criterion for the vocals and accompaniment atom spans that explains the mixture while penalising overlap between the spans, thereby eliminating the cross-source term that causes atoms to be selected for explaining the mixture rather than resembling their respective sources.
+Paper has 3 X likes
+Sep 04, 2026
+Develop methods for learning rules, risk thresholds, and priority relations in risk-aware rulebooks from expert demonstrations or observed safety outcomes, so that the framework can adapt to different environments and operating conditions.
+Paper has 1 X likes
+Sep 04, 2026
+Develop contextual-optimization methods that place uncertainty in the constraint and impose a risk-sensitive criterion on the constraint tail, rather than restricting uncertainty to an objective evaluated under risk neutrality.
+Paper has 1 X likes
+Sep 04, 2026
+Determine how to effectively model the information complementarity between different modalities in multimodal fusion for robot vision systems, where heterogeneous inputs (e.g., visual, depth, LiDAR, radar, language, or tactile signals) exhibit disparate structures and distributions that hinder unified representation and alignment.
+Paper has 0 X likes
+Sep 04, 2026
+Identify the operational mechanism responsible for the persistent positive residual covariance among AI data-center clusters after accounting for calendar effects and capacity normalization.
+Paper has 0 X likes
+Sep 04, 2026
+Develop a computationally efficient aggregation framework that handles multi-zone coupling in HVAC loads while avoiding the tradeoff between restrictive dimensional consistency and poor scalability.
+Paper has 0 X likes
+Sep 04, 2026
+Characterize near-field AFDM-enabled integrated sensing and communication by jointly resolving range, angle, and Doppler under spherical-wave propagation while exploiting AFDM’s delay-Doppler-domain structure.
+Paper has 0 X likes
+Sep 04, 2026
+Develop efficient near-field beam-training methods for uniform circular array systems operating in three-dimensional space, extending beyond the two-dimensional user-location model considered in the paper.
+Paper has 0 X likes
+Sep 04, 2026
+Develop distributed learning algorithms for decentralized settings that simultaneously achieve efficiency in computation and communication while providing rigorous differential privacy guarantees for participants’ data.
+Paper has 0 X likes
+Sep 04, 2026
+Establish whether large language model-based approaches add value over established heat-pump fault-detection and diagnosis methods, using a dedicated benchmark that treats defrost-cycle labelling, part-load coefficient-of-performance trajectories, and refrigerant-state channels as first-class inputs.
+Paper has 0 X likes
+Sep 04, 2026
+Determine how to dynamically balance physical-layer security and integrated sensing and communication performance in AFDM-enabled ISAC under rapidly changing user, target, and eavesdropper locations.
+Paper has 0 X likes
+Sep 04, 2026
+Determine the mechanisms that underpin precise synchronization of neural activity in the brain, in order to explain how large populations of neurons achieve coordinated timing across brain networks.
+Paper has 9.7k X likes
+Sep 03, 2026
+Determine whether the EEG-based speech decoding system trained via CLIP alignment between EEG and pre-trained audio embeddings using 175 hours of overt speech data from a single healthy participant can be transferred to other participants, and quantify the amount of participant-specific data required to enable such transferability through fine-tuning or adaptation.
+Paper has 437 X likes
+Sep 03, 2026
+Determine whether prediction error signals are encoded in the apical dendrites of cortical pyramidal neurons and, if so, characterize the conditions and mechanisms under which such dendritic error computation occurs.
+Paper has 366 X likes
+Sep 03, 2026
+Determine a datacenter network architecture that simultaneously delivers high performance and cost-efficiency for large-scale large language model training workloads.
+Paper has 317 X likes
+Sep 03, 2026
+Address distribution shifts in statistical verification and control caused by (i) simulation-to-reality gaps and (ii) couplings between controllers and statistical abstractions that induce dependence and shift between calibration and deployment data; develop methods to quantify, compensate for, or guarantee safety under such shifts.
+Paper has 192 X likes
+Sep 03, 2026
+Develop tractable probabilistic models that capture the diverse effects of higher-order interactions in complex systems in a principled manner, overcoming the combinatorial explosion inherent to exhaustive high-order representations while retaining interpretability and analytic tractability.
+Paper has 168 X likes
+Sep 03, 2026
+Determine the role and relative importance of higher-order (nonpairwise) interactions, compared to pairwise interactions, in shaping macroscopic brain dynamics by establishing whether and when higher-order interactions are necessary to explain neurophysiological time-series data such as EEG, iEEG, or fMRI recordings.
+Paper has 100 X likes
+Sep 03, 2026
+Determine the practical feasibility and efficacy of semantic communication-based models for wireless networks, specifically establishing their stability and performance across diverse environments and conditions when deployed in real-world systems.
+Paper has 38 X likes
+Sep 03, 2026
+Determine how to fully exploit temporal computational principles in spiking neural networks—including optimization and utilization of neuronal membrane time constants, synaptic delays or causal temporal convolution parameters, adaptive threshold mechanisms, and recurrent connectivity—to achieve maximal performance and parameter efficiency on temporal processing tasks.
+Paper has 20 X likes
+Sep 03, 2026
+Develop more robust and efficient numerical methods for identifying guided assembly protocols for larger networks than those tractable with the proposed Markov Chain Monte Carlo approach.
+Paper has 16 X likes
+Sep 03, 2026
+Determine the mechanisms by which the brain performs credit assignment and learning across both recurrent temporal dynamics and hierarchical cortical depth (cortical layers and regions).
+Paper has 12 X likes
+Sep 03, 2026
+Determine conditions and develop methods that guarantee stability, recursive feasibility, robustness, and online computational tractability for nonlinear control systems when incorporating learned components (such as learned dynamics models, cost functions, or constraints) into Model Predictive Control and related learning-based controllers, in order to reduce conservatism without sacrificing formal guarantees

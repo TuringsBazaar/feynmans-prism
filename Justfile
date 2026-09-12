@@ -8,13 +8,9 @@ default:
 sync:
     uv sync
 
-# Install graph deps (SPECTER2 + scikit-learn)
-sync-graph:
-    uv sync --group graph
-
 # Resolve graphs/corpus/paper-dump.md into Postgres (needs DATABASE_URL)
 ingest:
-    uv run corpus-ingest graphs/corpus/paper-dump.md
+    uv run gate graphs/corpus/paper-dump.md
 
 # Select top-k papers and read/write/execute urges
 policy problem:

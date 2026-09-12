@@ -5,7 +5,8 @@ import unittest
 from pathlib import Path
 
 from graphs.corpus_ingest.corpus import PaperSeed, ingest_corpus, parse_markdown
-from graphs.corpus_ingest.policy import run_policy
+from graphs.corpus_ingest.heuristics import load_heuristics
+from graphs.corpus_ingest.policy import load_questions, rank_papers, run_policy
 
 
 class FakeResolver:
@@ -104,11 +105,82 @@ https://curius.app/example/collection
             "doi TEXT",
             "title TEXT",
             "url TEXT",
+            "abstract TEXT",
+            "publication_year INTEGER",
+            "cited_by_count INTEGER",
+            "has_code BOOLEAN",
             "taste_score",
         ):
             self.assertIn(field, schema)
-        self.assertNotIn("abstract", schema)
         self.assertNotIn("citation", schema)
+
+
+class HeuristicsTests(unittest.TestCase):
+    def test_load_heuristics_reads_active_only(self) -> None:
+        heuristics = load_heuristics()
+        self.assertEqual(set(heuristics), {"H1", "H2", "H3", "H4", "H5"})
+        self.assertAlmostEqual(heuristics["H1"]["weight"], 0.9)
+        self.assertAlmostEqual(heuristics["H2"]["weight"], 0.9)
+        self.assertAlmostEqual(heuristics["H3"]["weight"], 0.9)
+        self.assertAlmostEqual(heuristics["H4"]["weight"], 0.5)
+
+    def test_rank_papers_emits_scores_and_h4(self) -> None:
+        papers = [
+            {
+                "paper_id": 1,
+                "doi": "10.1/a",
+                "title": "Fast transcranial focused ultrasound simulation",
+                "url": "https://doi.org/10.1/a",
+                "taste_score": 1.0,
+                "abstract": (
+                    "we propose a novel simulation with a baseline comparison, "
+                    "quantitative results, and accuracy of 90%"
+                ),
+                "publication_year": 2025,
+                "cited_by_count": 30,
+                "has_code": True,
+            },
+            {
+                "paper_id": 2,
+                "doi": "10.1/b",
+                "title": "Visual cortical coding",
+                "url": "https://doi.org/10.1/b",
+                "taste_score": 1.0,
+            },
+        ]
+        ranked = rank_papers("focused ultrasound simulation", papers)
+        self.assertEqual(ranked[0]["paper_id"], 1)
+        for name in (
+            "entropy",
+            "compression",
+            "implementation",
+            "methodological_integrity",
+        ):
+            self.assertIn(name, ranked[0]["signals"])
+        self.assertIn("h4", ranked[0])
+
+
+class QuestionTests(unittest.TestCase):
+    def test_load_questions_handles_bullets_and_numbered(self) -> None:
+        content = """\
+- Define appropriate neuromodulation dose parameters for TUS
+- Determine exact optimal parameters of 3D-printed holographic acoustic lenses
+1. Establish an optimal CT-to-acoustic-velocity mapping
+Some descriptive paragraph that should be ignored.
+"""
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "questions.md"
+            path.write_text(content)
+            questions = load_questions(path)
+
+        self.assertEqual(
+            questions,
+            [
+                "Define appropriate neuromodulation dose parameters for TUS",
+                "Determine exact optimal parameters of 3D-printed holographic acoustic lenses",
+                "Establish an optimal CT-to-acoustic-velocity mapping",
+            ],
+        )
 
 
 if __name__ == "__main__":

@@ -1,0 +1,2 @@
+- Define appropriate neuromodulation dose parameters for TUS
+- Determine exact optimal parameters of 3D-printed holographic acoustic lenses for transcranial FUS

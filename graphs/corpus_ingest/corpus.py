@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -12,6 +14,15 @@ from dataclasses import dataclass
 from itertools import pairwise
 from pathlib import Path
 
+# OpenAlex requires a mailto to grant the polite pool (10 req/s); without it the
+# shared IP gets 429s. Override with OPENALEX_MAILTO.
+OPENALEX_MAILTO = os.environ.get("OPENALEX_MAILTO", "corpus.logica@gmail.com")
+
+# OpenAlex is budgeted per day (free tier ~1000 req); once it starts 429ing, stop
+# hitting it for the rest of the run and degrade to arxiv / europepmc only.
+_OPENALEX_DOWN = False
+_OPENALEX_LOCK = threading.Lock()
+
 URL_RE = re.compile(r"https?://[^\s<>()\[\]]+", re.IGNORECASE)
 DOI_RE = re.compile(r"10\.\d{4,9}/[-._;()/:A-Z0-9]+", re.IGNORECASE)
 ARXIV_RE = re.compile(
@@ -21,6 +32,25 @@ ARXIV_RE = re.compile(
 PMID_RE = re.compile(r"pubmed\.ncbi\.nlm\.nih\.gov/(\d+)", re.IGNORECASE)
 PMCID_RE = re.compile(r"pmc\.ncbi\.nlm\.nih\.gov/articles/(PMC\d+)", re.IGNORECASE)
 NATURE_RE = re.compile(r"nature\.com/articles/(s[\w.-]+)", re.IGNORECASE)
+
+# export.arxiv.org asks for a 3-second gap between requests; serialize them so a
+# batch resolve does not trip its 429 throttle and silently drop papers.
+_ARXIV_LOCK = threading.Lock()
+_ARXIV_LAST = 0.0
+_ARXIV_INTERVAL = 3.1
+
+
+def _atom_text(entry: ET.Element, name: str, namespace: str) -> str | None:
+    found = entry.find(f"{namespace}{name}")
+    if found is None:
+        for element in entry.iter():
+            if element.tag.rsplit("}", 1)[-1] == name:
+                found = element
+                break
+    if found is None or found.text is None:
+        return None
+    return " ".join(found.text.split()) or None
+
 
 PAPER_HOSTS = {
     "annualreviews.org",
@@ -226,25 +256,67 @@ class PaperResolver:
         raise RuntimeError("unreachable retry state")
 
     def _openalex(self, *, field: str | None = None, value: str) -> dict | None:
+        global _OPENALEX_DOWN
+        with _OPENALEX_LOCK:
+            if _OPENALEX_DOWN:
+                return None
         query = {"filter": f"{field}:{value}"} if field else {"search": value}
         query["per-page"] = 1
+        query["mailto"] = OPENALEX_MAILTO
         params = urllib.parse.urlencode(query)
-        results = (
-            self._json(f"https://api.openalex.org/works?{params}").get("results") or []
-        )
+        try:
+            results = (
+                self._json(f"https://api.openalex.org/works?{params}").get("results")
+                or []
+            )
+        except (OSError, ValueError):
+            with _OPENALEX_LOCK:
+                _OPENALEX_DOWN = True
+            return None
         return results[0] if results else None
 
-    def _arxiv_title(self, arxiv_id: str) -> str | None:
-        params = urllib.parse.urlencode({"id_list": arxiv_id})
-        request = urllib.request.Request(
-            f"https://export.arxiv.org/api/query?{params}",
-            headers={"User-Agent": "propagate-yourself corpus-ingest/0.1"},
-        )
-        with urllib.request.urlopen(request, timeout=self.timeout) as response:
-            root = ET.fromstring(response.read())
-        namespace = "{http://www.w3.org/2005/Atom}"
-        title = root.findtext(f"{namespace}entry/{namespace}title")
-        return " ".join(title.split()) if title else None
+    @staticmethod
+    def _arxiv_year(arxiv_id: str) -> int | None:
+        match = re.match(r"(\d{2})\d{2}\.", arxiv_id)
+        if not match:
+            return None
+        return 2000 + int(match.group(1))
+
+    def _arxiv_metadata(
+        self, arxiv_id: str
+    ) -> tuple[str | None, str | None, str | None]:
+        global _ARXIV_LAST
+        with _ARXIV_LOCK:
+            wait = _ARXIV_INTERVAL - (time.monotonic() - _ARXIV_LAST)
+            if wait > 0:
+                time.sleep(wait)
+            for attempt in range(3):
+                params = urllib.parse.urlencode({"id_list": arxiv_id})
+                request = urllib.request.Request(
+                    f"https://export.arxiv.org/api/query?{params}",
+                    headers={"User-Agent": "propagate-yourself corpus-ingest/0.1"},
+                )
+                try:
+                    with urllib.request.urlopen(
+                        request, timeout=self.timeout
+                    ) as response:
+                        _ARXIV_LAST = time.monotonic()
+                        root = ET.fromstring(response.read())
+                except urllib.error.HTTPError as error:
+                    if error.code != 429 or attempt == 2:
+                        raise
+                    time.sleep(float(error.headers.get("Retry-After") or attempt + 1))
+                    continue
+                namespace = "{http://www.w3.org/2005/Atom}"
+                entry = root.find(f"{namespace}entry")
+                if entry is None:
+                    return None, None, None
+                return (
+                    _atom_text(entry, "title", namespace),
+                    _atom_text(entry, "summary", namespace),
+                    _atom_text(entry, "comment", namespace),
+                )
+        raise RuntimeError("unreachable arxiv retry state")
 
     def _europe_pmc_doi(self, pmcid: str) -> str | None:
         params = urllib.parse.urlencode({"query": pmcid, "format": "json"})
@@ -274,10 +346,60 @@ class PaperResolver:
 
         return meta("citation_doi"), meta("citation_title")
 
+    def _abstract(self, work: dict) -> str:
+        inverted = work.get("abstract_inverted_index")
+        if not inverted:
+            return ""
+        positions = []
+        for word, indices in inverted.items():
+            for index in indices:
+                positions.append((index, word))
+        positions.sort()
+        return " ".join(word for _, word in positions)
+
+    @staticmethod
+    def _has_code(text: str | None) -> bool:
+        if not text:
+            return False
+        lowered = text.lower()
+        return any(
+            marker in lowered
+            for marker in (
+                "github",
+                "code is available",
+                "open-source",
+                "open source",
+                "source code",
+            )
+        )
+
+    def _paper(
+        self,
+        seed: PaperSeed,
+        *,
+        doi: str | None,
+        title: str,
+        url: str,
+        abstract: str | None,
+        publication_year: int | None,
+        cited_by_count: int | None,
+    ) -> dict:
+        return {
+            "doi": doi,
+            "title": title,
+            "url": url,
+            "abstract": abstract,
+            "publication_year": publication_year,
+            "cited_by_count": cited_by_count,
+            "has_code": self._has_code(abstract),
+            "taste_score": seed.taste_score,
+        }
+
     def resolve(self, seed: PaperSeed) -> tuple[dict | None, str | None]:
         try:
             work = None
             title = seed.title_hint
+            arxiv_abstract = None
             if seed.doi:
                 work = self._openalex(field="doi", value=f"https://doi.org/{seed.doi}")
             elif seed.pmid:
@@ -290,7 +412,8 @@ class PaperResolver:
                     else None
                 )
             elif seed.arxiv_id:
-                title = self._arxiv_title(seed.arxiv_id) or title
+                arxiv_title, arxiv_abstract, _ = self._arxiv_metadata(seed.arxiv_id)
+                title = arxiv_title or title
                 work = self._openalex(value=title) if title else None
             if not work and seed.url:
                 try:
@@ -314,32 +437,38 @@ class PaperResolver:
                 url = f"https://doi.org/{doi}" if doi else seed.url
                 if not url and seed.arxiv_id:
                     url = f"https://arxiv.org/abs/{seed.arxiv_id}"
-                return {
-                    "doi": doi,
-                    "title": resolved_title,
-                    "url": url,
-                    "taste_score": seed.taste_score,
-                }, None
+                return self._paper(
+                    seed,
+                    doi=doi,
+                    title=resolved_title,
+                    url=url,
+                    abstract=self._abstract(work) or arxiv_abstract,
+                    publication_year=work.get("publication_year"),
+                    cited_by_count=work.get("cited_by_count"),
+                ), None
             if title and seed.url:
-                return {
-                    "doi": seed.doi,
-                    "title": title,
-                    "url": seed.url,
-                    "taste_score": seed.taste_score,
-                }, None
+                year = self._arxiv_year(seed.arxiv_id) if seed.arxiv_id else None
+                return self._paper(
+                    seed,
+                    doi=seed.doi,
+                    title=title,
+                    url=seed.url,
+                    abstract=arxiv_abstract,
+                    publication_year=year,
+                    cited_by_count=None,
+                ), None
             return None, "could not resolve a title and canonical URL"
         except (OSError, ValueError, ET.ParseError) as error:
             return None, f"{type(error).__name__}: {error}"
 
 
-def ingest_corpus(
-    source_path: str | Path,
+def resolve_papers(
+    papers: list[PaperSeed],
     *,
     resolver: PaperResolver | None = None,
     max_workers: int = 4,
     timeout: float = 15.0,
-) -> dict:
-    parsed = parse_markdown(source_path)
+) -> tuple[list[dict], list[dict]]:
     active_resolver = resolver or PaperResolver(timeout=timeout)
 
     def resolve(seed: PaperSeed) -> tuple[PaperSeed, dict | None, str | None]:
@@ -347,7 +476,7 @@ def ingest_corpus(
         return seed, paper, error
 
     with ThreadPoolExecutor(max_workers=max(1, max_workers)) as executor:
-        resolved = list(executor.map(resolve, parsed.papers))
+        resolved = list(executor.map(resolve, papers))
 
     papers_by_key = {}
     skipped = []
@@ -361,8 +490,22 @@ def ingest_corpus(
             current["taste_score"] = max(current["taste_score"], paper["taste_score"])
         else:
             papers_by_key[key] = paper
-    papers = sorted(
+    resolved_papers = sorted(
         papers_by_key.values(), key=lambda item: item.get("doi") or item["url"]
+    )
+    return resolved_papers, skipped
+
+
+def ingest_corpus(
+    source_path: str | Path,
+    *,
+    resolver: PaperResolver | None = None,
+    max_workers: int = 4,
+    timeout: float = 15.0,
+) -> dict:
+    parsed = parse_markdown(source_path)
+    papers, skipped = resolve_papers(
+        parsed.papers, resolver=resolver, max_workers=max_workers, timeout=timeout
     )
     return {
         "papers": papers,

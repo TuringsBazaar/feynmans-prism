@@ -60,3 +60,37 @@ https://pubmed.ncbi.nlm.nih.gov/40275098/
 https://www.sciencedirect.com/science/article/pii/S0896627326001728
 https://www.science.org/doi/10.1126/sciadv.aea8233
 https://www.nature.com/articles/s41565-025-01990-5
+
+## awesome-fus-neurotech-problems — source papers (emergent mind, FUS + acoustic physics)
+https://github.com/TuringsBazaar/awesome-fus-neurotech-problems
+- https://arxiv.org/abs/2401.17818
+- https://arxiv.org/abs/2402.10027
+- https://arxiv.org/abs/2403.14740
+- https://arxiv.org/abs/2404.05937
+- https://arxiv.org/abs/2405.01168
+- https://arxiv.org/abs/2405.10562
+- https://arxiv.org/abs/2405.10716
+- https://arxiv.org/abs/2405.12194
+- https://arxiv.org/abs/2405.15621
+- https://arxiv.org/abs/2409.06102
+- https://arxiv.org/abs/2411.02469
+- https://arxiv.org/abs/2501.01180
+- https://arxiv.org/abs/2501.10894
+- https://arxiv.org/abs/2502.03632
+- https://arxiv.org/abs/2505.11103
+- https://arxiv.org/abs/2508.09799
+- https://arxiv.org/abs/2508.10405
+- https://arxiv.org/abs/2510.15606
+- https://arxiv.org/abs/2510.19833
+- https://arxiv.org/abs/2604.01013
+- https://arxiv.org/abs/2608.13853
+- https://arxiv.org/abs/2608.16208
+- https://arxiv.org/abs/2608.17448
+- https://arxiv.org/abs/2608.27959
+- https://arxiv.org/abs/2608.28157
+- https://arxiv.org/abs/2608.30840
+- https://arxiv.org/abs/2608.30886
+- https://arxiv.org/abs/2609.01080
+- https://arxiv.org/abs/2609.03490
+- https://arxiv.org/abs/2609.03536
+- https://arxiv.org/abs/2609.03644
