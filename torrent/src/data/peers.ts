@@ -1,0 +1,1 @@
+export const NAMED_PEARS = ['aman', 'guillefix', 'alex', 'yoyo', 'lucy'] as const

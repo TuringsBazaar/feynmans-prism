@@ -90,6 +90,59 @@ are retained on resume, labeled `user_added`, and excluded from automatic model
 context and pheromone rewards. The final answer is rendered deterministically
 from reviewed records and your appended analysis; it needs no extra model call.
 
+## Visualize in the browser
+
+`view` writes a single self-contained HTML page that renders the research tree
+with plain JavaScript and SVG — no external libraries
+or CDN. The data is inlined, so the page is fully offline and portable. Layouts
+are computed once per interaction (static, on demand) — there is no force
+simulation or continuous animation. It is a browser view of the same data
+`tree` and `answer` print as text.
+
+```bash
+node tools/research/cli.mjs view \
+  --db tools/outputs/credit-assignment-passages.sqlite \
+  --out tools/outputs/credit-assignment-passages.view.html --open
+```
+
+`--out` defaults to the database path with `.sqlite` replaced by `.view.html`.
+`--open` launches it in the default browser on macOS. The viewer uses a purple
+theme, small circular nodes, and full-length wrapped text beside each node.
+Click a circle or its label (or focus it and press Enter/Space) to select it. The right-hand panel shows
+the full statement, review reasoning, exact quoted source passage, source link,
+and linked premises, conclusions, limitations, questions, and overlapping evidence.
+Selecting a paper shows its relevance judgment and the passage supporting it.
+Click a connection in the panel to inspect that node; its ancestors expand in
+the tree. Separate **+ / −** controls collapse branches without changing selection.
+
+The viewer has one **Tree** surface. It starts with a compact question-and-papers
+overview; **Expand all** reveals every branch. Use the **−**, percentage, and **+**
+controls to zoom out, reset to 100%, and zoom in. The mouse wheel or trackpad
+zooms around the pointer. Hold the mouse wheel and drag to pan the tree. These
+controls are also explained in an overlay on the tree. The detail panel scrolls
+independently on the right, and moves below the diagram on narrow screens. The
+offline export includes source snapshots to resolve evidence offsets without a server.
+
+For the credit-assignment run, `tools/outputs/human-commentary.md` records zero
+paper-ID overlap with three Emergent Mind references. The database also stores
+per-paper model relevance judgments (two `direct`, one `related`) and their
+reviews. These assess relevance to the question; there is no saved comparative
+relevance assessment against the Emergent Mind papers. Zero overlap alone does
+not establish that the selected papers are irrelevant.
+
+### Deploy the viewer to Cloudflare
+
+Build a dedicated static directory and deploy it with an authenticated Wrangler:
+
+```bash
+node tools/research/build-site.mjs
+wrangler deploy --config tools/research/cloudflare/wrangler.jsonc
+```
+
+Only `tools/outputs/prism-site/` is published. Its standalone `index.html` contains
+the tree, reviews, and source snapshots for evidence display; the SQLite databases
+are not deployed. Rebuild and redeploy to publish later research or viewer changes.
+
 ## ACO and evidence review
 
 The action vocabulary is `search`, `fetch`, `extract`, `verify`, and `follow`.

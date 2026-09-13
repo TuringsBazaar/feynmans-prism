@@ -1,0 +1,203 @@
+.app {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 32px 20px 64px;
+}
+
+.app-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 28px;
+  letter-spacing: -0.5px;
+}
+
+.status {
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
+
+.status.on {
+  color: var(--ok, #16a34a);
+  border-color: currentColor;
+}
+
+.status.off {
+  color: var(--text);
+}
+
+.pears {
+  margin-bottom: 24px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.pears h2 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.pears ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pears .pear {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.pears .pear.empty {
+  opacity: 0.7;
+}
+
+.pears .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--border);
+}
+
+.pears .dot.live {
+  background: var(--ok, #16a34a);
+}
+
+.problems {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.problem {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.problem.is-joined {
+  border-color: var(--accent-border);
+}
+
+.problem-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+}
+
+.join {
+  display: inline-flex;
+  align-items: center;
+}
+
+.join input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.join span {
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--accent);
+}
+
+.problem-title {
+  flex: 1;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 8px;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text-h);
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
+.problem-title .chevron {
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.title-text {
+  display: inline-block;
+}
+
+.peers {
+  font-size: 13px;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.peers .you {
+  font-style: normal;
+  color: var(--accent);
+}
+
+.problem-body {
+  padding: 0 14px 14px 46px;
+  border-top: 1px solid var(--border);
+}
+
+.subproblems {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.subproblem {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.subproblem .kind {
+  flex: none;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  text-transform: lowercase;
+  white-space: nowrap;
+}
+
+.tokens {
+  margin-top: 12px;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text);
+}

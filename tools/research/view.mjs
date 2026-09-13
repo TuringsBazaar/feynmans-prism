@@ -2,382 +2,73 @@
 //
 // Distinct from render.mjs: render.mjs produces CLI text (a Unicode tree and a
 // Markdown answer). This module produces a single self-contained HTML page that
-// renders the same data as an interactive D3 diagram. Layouts are computed
-// once per interaction (static, on demand) — there is no force simulation and
-// no continuous animation.
+// renders the same data as an interactive SVG diagram with no external
+// dependencies (no D3, no CDN). Layouts are computed once per interaction
+// (static, on demand) — there is no simulation and no continuous animation.
 
-const short = (text) => (text || "").replace(/\s+/g, " ").trim();
+import { mountView } from "./view-client.mjs";
 
 function escapeJson(value) {
   return JSON.stringify(value).replace(/</g, "\\u003c");
 }
 
-// Build one argument-graph record per paper from the nested tree. Containment
-// lives in the tree; argument edges are the inference premise -> conclusion
-// links stored on inference node data.
-function buildGraphs(tree) {
-  const graphs = [];
-  for (const paper of tree.children || []) {
-    if (paper.kind !== "paper") continue;
-    const all = [];
-    const collect = (n) => { all.push(n); (n.children || []).forEach(collect); };
-    collect(paper);
-
-    const claims = all.filter((n) =>
-      ["assumption", "intermediate", "limitation", "conclusion"].includes(n.kind)
-    );
-    const inferences = all.filter((n) => n.kind === "inference");
-    const openQuestions = all.filter((n) => n.kind === "open_question");
-    const relatedPapers = all.filter((n) => n.kind === "related_paper");
-
-    const nodes = claims.map((n) => ({
-      id: n.id,
-      kind: n.kind,
-      label: short(n.label),
-      verdict: n.data?.status || "unreviewed",
-      origin: n.data?.origin || "author_stated",
-    }));
-
-    const links = [];
-    for (const inf of inferences) {
-      const premises = inf.data?.premise_node_ids || [];
-      const conclusion = inf.data?.conclusion_node_id;
-      if (conclusion == null) continue;
-      for (const p of premises) {
-        links.push({
-          source: p,
-          target: conclusion,
-          kind: inf.data?.kind || "inference",
-          verdict: inf.data?.status || "unreviewed",
-          inferenceId: inf.id,
-        });
-      }
-    }
-
-    graphs.push({
-      sourceId: paper.source_id,
-      title: paper.label,
-      url: paper.data?.url,
-      paperKey: paper.data?.paper_key,
-      contentHash: paper.data?.content_hash,
-      match: paper.data?.match || null,
-      matchReview: paper.data?.match_review || null,
-      nodes,
-      links,
-      openQuestions: openQuestions.map((q) => ({
-        id: q.id,
-        statement: short(q.label),
-        limitation: q.data?.limitation_node_id ?? null,
-        verdict: q.data?.status || "unreviewed",
-        origin: q.data?.origin || "author_stated",
-        evidence: q.data?.evidence || null,
-      })),
-      relatedPapers: relatedPapers.map((r) => ({
-        id: r.id,
-        title: short(r.label),
-        relationship: r.data?.relationship || "cited",
-        rationale: r.data?.rationale || "",
-        verdict: r.data?.status || "unreviewed",
-        evidence: r.data?.evidence || null,
-      })),
-      rejected: all.filter((n) => n.kind === "rejected_item").length,
-    });
-  }
-  return graphs;
+const CSS = `
+:root { color-scheme: dark; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; background: #120d1c; color: #eee6f8; font: 13px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+body { display: flex; flex-direction: column; }
+header { padding: 12px 18px; border-bottom: 1px solid #3b2953; }
+header h1 { margin: 0 0 4px; font-size: 15px; }
+.meta, .eyebrow { color: #bba6ce; font-size: 12px; }
+#toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 18px; }
+button { font: inherit; color: inherit; background: #241632; border: 1px solid #654880; border-radius: 6px; padding: 6px 12px; }
+button { cursor: pointer; }
+button:hover { background: #402457; }
+button.active { background: #633687; }
+button:disabled { cursor: default; opacity: .45; }
+.section-title { font-size: 13px; font-weight: 650; letter-spacing: .03em; margin-right: 4px; }
+#zoom-controls { display: inline-flex; align-items: center; gap: 5px; padding-left: 7px; border-left: 1px solid #3b2953; }
+#zoom-controls button { min-width: 34px; padding-inline: 9px; }
+#zoom-level { min-width: 48px; text-align: center; color: #bba6ce; font-variant-numeric: tabular-nums; }
+.hint { margin-left: auto; color: #bba6ce; font-size: 12px; }
+#main { display: grid; grid-template-columns: minmax(0, 1fr) clamp(320px, 36vw, 520px); flex: 1; min-height: 0; border-top: 1px solid #3b2953; }
+#stage { min-width: 0; overflow: auto; padding: 12px; }
+#stage.panning, #stage.panning * { cursor: grabbing !important; user-select: none; }
+.canvas-help-wrap { position: sticky; top: 0; left: 0; z-index: 5; height: 0; pointer-events: none; }
+.canvas-help { display: inline-block; margin: 8px; padding: 6px 9px; color: #d9c3eb; background: rgba(36, 22, 50, .92); border: 1px solid #654880; border-radius: 7px; box-shadow: 0 4px 14px rgba(0, 0, 0, .25); }
+svg { display: block; background: #170f22; border-radius: 8px; }
+svg text { fill: #f1e8fc; }
+.node-kind { font-size: 10px; fill: #b99cd4; }
+.node-label { font-size: 13px; }
+.node-label, .node-kind { paint-order: stroke; stroke: #170f22; stroke-width: 5px; stroke-linejoin: round; }
+.node-hit { fill: transparent; stroke: none; }
+.node-dot { stroke: #dec4f5; stroke-width: 1; }
+.node-halo { fill: transparent; stroke: transparent; stroke-width: 2; }
+.diagram-node, .collapse-control { cursor: pointer; }
+.diagram-node:hover .node-halo, .diagram-node:focus .node-halo { stroke: #8861aa; }
+.diagram-node.selected .node-halo { fill: #603486; stroke: #d2a7f5; }
+.diagram-node.selected .node-label { fill: #e1b8ff; }
+.collapse-control circle { fill: #2d1b40; stroke: #bd90e8; }
+.collapse-control:focus circle { stroke: white; stroke-width: 3; }
+.tree-edge { fill: none; stroke: #6c4c85; stroke-width: 2; }
+#detail { min-width: 0; border-left: 1px solid #3b2953; padding: 18px; overflow-y: auto; overflow-wrap: anywhere; }
+#detail h2 { font-size: 18px; line-height: 1.4; margin: 6px 0 20px; }
+.row { margin: 0 0 18px; }
+.k { margin: 0 0 5px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #bba6ce; }
+.v { white-space: pre-wrap; }
+a { color: #d5aaff; }
+blockquote { margin: 0; border-left: 3px solid #a16bcc; padding: 8px 12px; background: #21152f; white-space: pre-wrap; }
+.node-links { display: grid; gap: 7px; }
+.node-link { display: block; width: 100%; padding: 9px 10px; text-align: left; white-space: normal; overflow-wrap: anywhere; }
+:focus-visible { outline: 2px solid #e4c2ff; outline-offset: 3px; }
+@media (max-width: 700px) {
+  #main { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(160px, 44%) minmax(0, 1fr); }
+  #detail { border-left: 0; border-top: 1px solid #3b2953; padding: 14px; }
+  header h1 { font-size: 13px; max-height: 80px; overflow: auto; }
+  .hint { margin-left: 0; }
 }
-
-const CSS = [
-  ":root { color-scheme: dark; }",
-  "html, body { margin: 0; padding: 0; background: #10141b; color: #d7dde6; font: 13px/1.45 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }",
-  "header { padding: 14px 18px 10px; border-bottom: 1px solid #232a35; }",
-  "header h1 { margin: 0 0 4px; font-size: 15px; font-weight: 600; }",
-  "header .meta { color: #8b96a5; font-size: 12px; }",
-  "#toolbar { display: flex; gap: 8px; align-items: center; padding: 8px 18px; border-bottom: 1px solid #232a35; }",
-  "#toolbar button { background: #1a2029; color: #d7dde6; border: 1px solid #2b3441; padding: 5px 12px; border-radius: 6px; cursor: pointer; }",
-  "#toolbar button.active { background: #2b4a7a; border-color: #3b5f9a; }",
-  "#toolbar select { background: #1a2029; color: #d7dde6; border: 1px solid #2b3441; border-radius: 6px; padding: 5px 8px; }",
-  "#toolbar .hint { margin-left: auto; color: #6b7683; font-size: 11px; }",
-  "#main { display: flex; }",
-  "#stage { flex: 1 1 auto; min-width: 0; padding: 12px; overflow: auto; }",
-  "svg { display: block; background: #12161d; border: 1px solid #202732; border-radius: 8px; }",
-  "svg text { fill: #d7dde6; }",
-  "#detail { flex: 0 0 340px; border-left: 1px solid #232a35; padding: 14px 16px; overflow: auto; max-height: calc(100vh - 120px); }",
-  "#detail h2 { font-size: 13px; margin: 0 0 10px; }",
-  "#detail .row { margin: 0 0 10px; }",
-  "#detail .k { color: #6b7683; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }",
-  "#detail .v { margin-top: 1px; word-wrap: break-word; }",
-  "#detail .v a { color: #7aa2d8; }",
-  "#detail .badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; color: #0c0f14; }",
-  "#detail .empty { color: #6b7683; }",
-  ".ov-list { margin-top: 18px; }",
-  ".ov-list h3 { font-size: 12px; color: #8b96a5; margin: 12px 0 6px; }",
-  ".ov-list li { margin: 0 0 6px; }",
-  ".ov-list a { color: #7aa2d8; }",
-  ".legend { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 10px 18px; color: #8b96a5; font-size: 11px; }",
-  ".legend span { display: inline-flex; align-items: center; gap: 5px; }",
-  ".swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }",
-].join("\n");
-
-const JS = [
-  'const KIND = {',
-  '  question: "#5B5B5B", paper: "#3b71ca",',
-  '  central_arguments: "#5b6572", open_questions: "#5b6572", related_papers: "#5b6572", validation_issues: "#5b6572",',
-  '  assumption: "#4e79a7", intermediate: "#b07aa1", conclusion: "#59a14f", limitation: "#e15759",',
-  '  inference: "#f28e2b", open_question: "#76b7b2", related_paper: "#edc948", rejected_item: "#d62728",',
-  '  analysis: "#9c755f",',
-  '};',
-  'function statusColor(s) {',
-  '  if (s === "supported" || s === "reviewed") return "#2ca02c";',
-  '  if (s === "uncertain" || s === "fetched") return "#f2a93b";',
-  '  if (s === "rejected") return "#d62728";',
-  '  if (s === "user_added") return "#8ca3c3";',
-  '  return "#5b6572";',
-  '}',
-  'function badge(s) {',
-  '  if (!s || s === "unreviewed" || s === "candidate") return "<span class=\\"badge\\" style=\\"background:#5b6572\\">" + (s || "unreviewed") + "</span>";',
-  '  return "<span class=\\"badge\\" style=\\"background:" + statusColor(s) + '">' + s + '</span>";',
-  '}',
-  'const DATA = __RESEARCH_DATA__;',
-  'const NODE_INDEX = {};',
-  '(function idx(n) { NODE_INDEX[n.id] = n; (n.children || []).forEach(idx); })(DATA.tree);',
-  'const SRC = {};',
-  'DATA.sources.forEach(function (s) { SRC[s.id] = s; });',
-  'function el(id) { return document.getElementById(id); }',
-  '',
-  '// ---------- detail panel ----------',
-  'function showDetail(id) {',
-  '  const n = NODE_INDEX[id];',
-  '  if (!n) { return; }',
-  '  const d = n.data || {};',
-  '  const src = SRC[n.source_id];',
-  '  const rows = [];',
-  '  rows.push(["id", String(n.id)]);',
-  '  rows.push(["kind", n.kind]);',
-  '  rows.push(["origin", d.origin || "—"]);',
-  '  rows.push(["status", d.status || "—"]);',
-  '  if (d.statement) rows.push(["statement", d.statement]);',
-  '  if (d.review_reason) rows.push(["review", d.review_reason]);',
-  '  if (d.rationale) rows.push(["rationale", d.rationale]);',
-  '  if (d.relationship) rows.push(["relationship", d.relationship]);',
-  '  if (d.premise_node_ids) rows.push(["premises", d.premise_node_ids.map(String).join(", ")]);',
-  '  if (d.conclusion_node_id != null) rows.push(["conclusion", String(d.conclusion_node_id)]);',
-  '  if (d.limitation_node_id != null) rows.push(["limitation", String(d.limitation_node_id)]);',
-  '  if (d.match) rows.push(["match", d.match.level + " — " + (d.match.reason || "")]);',
-  '  if (d.match_review) rows.push(["match review", d.match_review.verdict + " — " + (d.match_review.reason || "")]);',
-  '  const ev = d.evidence;',
-  '  if (ev && src) {',
-  '    const link = " chars " + ev.start + "–" + ev.end + " → " + src.url;',
-  '    rows.push(["evidence", (src.paper_key || "") + " snapshot " + String(ev.content_hash || "").slice(0, 12) + link]);',
-  '  }',
-  '  const box = el("detail");',
-  '  let html = "<h2>" + escapeHtml(short(n.label)) + "</h2>";',
-  '  for (const kv of rows) {',
-  '    const v = kv[1];',
-  '    const out = /^(https?:\\/\\/)/.test(v) ? "<a href=\\"" + v + "\\">" + v + "</a>" : escapeHtml(String(v));',
-  '    html += "<div class=\\"row\\"><div class=\\"k\\">" + kv[0] + "</div><div class=\\"v\\">" + out + "</div></div>";',
-  '  }',
-  '  if (!rows.length) html += "<div class=\\"empty\\">No detail available.</div>";',
-  '  box.innerHTML = html;',
-  '}',
-  'function escapeHtml(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }',
-  '',
-  '// ---------- tree view ----------',
-  'let treeRoot = null;',
-  'const DX = 250, DY = 26;',
-  'function layoutTree() {',
-  '  let leaf = 0;',
-  '  treeRoot.eachAfter(function (n) {',
-  '    n.x = n.depth * DX;',
-  '    const kids = n.children || [];',
-  '    if (!kids.length) { n.y = leaf * DY; leaf += 1; }',
-  '    else { n.y = d3.mean(kids, function (k) { return k.y; }); }',
-  '  });',
-  '}',
-  'function treePath(d) {',
-  '  return "M" + d.source.x + "," + d.source.y + " C" + (d.source.x + d.target.x) / 2 + "," + d.source.y + " " + (d.source.x + d.target.x) / 2 + "," + d.target.y + " " + d.target.x + "," + d.target.y;',
-  '}',
-  'function renderTree() {',
-  '  const svg = el("tree-svg");',
-  '  svg.innerHTML = "";',
-  '  layoutTree();',
-  '  const nodes = treeRoot.descendants();',
-  '  const links = treeRoot.links();',
-  '  const maxX = d3.max(nodes, function (n) { return n.x; }) || 0;',
-  '  const maxY = d3.max(nodes, function (n) { return n.y; }) || 0;',
-  '  const W = maxX + 620, H = maxY + 40;',
-  '  svg.setAttribute("viewBox", "0 0 " + W + " " + H);',
-  '  svg.style.width = "100%";',
-  '  svg.style.height = Math.min(720, Math.max(360, H)) + "px";',
-  '  const g = d3.select(svg).append("g").attr("transform", "translate(16,20)");',
-  '  g.append("g").selectAll("path").data(links).join("path")',
-  '    .attr("fill", "none").attr("stroke", "#3a4452").attr("stroke-width", 1)',
-  '    .attr("d", treePath);',
-  '  const node = g.append("g").selectAll("g").data(nodes).join("g")',
-  '    .attr("transform", function (d) { return "translate(" + d.x + "," + d.y + ")"; })',
-  '    .style("cursor", "pointer");',
-  '  node.append("circle")',
-  '    .attr("r", function (d) { return d.data.kind === "inference" ? 4 : 6; })',
-  '    .attr("fill", function (d) { return KIND[d.data.kind] || "#999"; })',
-  '    .attr("stroke", function (d) { return statusColor(d.data.data && d.data.data.status); })',
-  '    .attr("stroke-width", function (d) { return (d.data.data && d.data.data.status && d.data.data.status !== "unreviewed") ? 1.5 : 0; })',
-  '    .on("click", function (event, d) {',
-  '      if (d.children) { d._children = d.children; d.children = null; }',
-  '      else if (d._children) { d.children = d._children; d._children = null; }',
-  '      else { showDetail(d.data.id); return; }',
-  '      renderTree();',
-  '    });',
-  '  node.append("text")',
-  '    .attr("x", 10).attr("dy", "0.32em").attr("font-size", "11px")',
-  '    .attr("fill", function (d) { return d.data.kind === "paper" ? "#d7dde6" : "#c2ccd8"; })',
-  '    .text(function (d) {',
-  '      let t = "[" + d.data.id + "] " + d.data.kind + ": " + short(d.data.label);',
-  '      const s = d.data.data && d.data.data.status;',
-  '      if (s && s !== "unreviewed") t += "  (" + s + ")";',
-  '      return t;',
-  '    })',
-  '    .on("click", function (event, d) { showDetail(d.data.id); event.stopPropagation(); });',
-  '}',
-  'function initTree() {',
-  '  treeRoot = d3.hierarchy(DATA.tree, function (d) { return d.children; });',
-  '  treeRoot.descendants().forEach(function (d) { d._children = d.children || null; d.children = d._children; });',
-  '  renderTree();',
-  '}',
-  '',
-  '// ---------- graph view (static layered layout, computed once) ----------',
-  'function graphById(gi, id) { return gi.nodes.find(function (n) { return n.id === id; }); }',
-  'function renderGraph(gi) {',
-  '  const svg = el("graph-svg");',
-  '  svg.innerHTML = "";',
-  '  const idMap = {};',
-  '  gi.nodes.forEach(function (n) { idMap[n.id] = n; });',
-  '  const links = gi.links.filter(function (l) { return idMap[l.source] && idMap[l.target]; });',
-  '  const adj = {}; const indeg = {};',
-  '  gi.nodes.forEach(function (n) { adj[n.id] = []; indeg[n.id] = 0; });',
-  '  links.forEach(function (l) { adj[l.source].push(l.target); indeg[l.target] += 1; });',
-  '  const depth = {}; const q = [];',
-  '  gi.nodes.forEach(function (n) { if (indeg[n.id] === 0) q.push(n.id); });',
-  '  const queue = q.slice();',
-  '  while (queue.length) {',
-  '    const u = queue.shift();',
-  '    for (const v of adj[u]) {',
-  '      depth[v] = Math.max(depth[v] || 0, (depth[u] || 0) + 1);',
-  '      indeg[v] -= 1;',
-  '      if (indeg[v] === 0) queue.push(v);',
-  '    }',
-  '  }',
-  '  gi.nodes.forEach(function (n) { if (depth[n.id] == null) depth[n.id] = 0; });',
-  '  const byDepth = {};',
-  '  gi.nodes.forEach(function (n) { (byDepth[depth[n.id]] = byDepth[depth[n.id]] || []).push(n.id); });',
-  '  const row = {};',
-  '  Object.keys(byDepth).forEach(function (k) { byDepth[k].sort(); byDepth[k].forEach(function (id, i) { row[id] = i; }); });',
-  '  const maxDepth = Math.max.apply(null, gi.nodes.map(function (n) { return depth[n.id]; }));',
-  '  const maxRows = Math.max.apply(null, Object.keys(byDepth).map(function (k) { return byDepth[k].length; }));',
-  '  const COL = 230, ROWH = 46, ML = 30, MT = 30, MR = 200, MB = 30;',
-  '  const W = ML + MR + maxDepth * COL + 180;',
-  '  const H = MT + MB + Math.max(1, maxRows) * ROWH;',
-  '  svg.setAttribute("viewBox", "0 0 " + W + " " + H);',
-  '  svg.style.width = "100%";',
-  '  svg.style.height = Math.min(720, Math.max(300, H)) + "px";',
-  '  const x = function (id) { return ML + depth[id] * COL; };',
-  '  const y = function (id) { return MT + row[id] * ROWH + 20; };',
-  '  const defs = d3.select(svg).append("defs");',
-  '  defs.append("marker").attr("id", "arrow").attr("viewBox", "0 -5 10 10").attr("refX", 9).attr("refY", 0)',
-  '    .attr("markerWidth", 6).attr("markerHeight", 6).attr("orient", "auto")',
-  '    .append("path").attr("d", "M0,-5L10,0L0,5").attr("fill", "#5b6572");',
-  '  const g = d3.select(svg).append("g");',
-  '  const edge = g.append("g").selectAll("g").data(links).join("g");',
-  '  edge.append("path")',
-  '    .attr("fill", "none").attr("stroke", function (l) { return statusColor(l.verdict); })',
-  '    .attr("stroke-width", 1.4).attr("marker-end", "url(#arrow)")',
-  '    .attr("d", function (l) {',
-  '      return "M" + (x(l.source) + 84) + "," + y(l.source) + " C" + (x(l.source) + 84 + (x(l.target) - x(l.source) - 84) / 2) + "," + y(l.source) + " " + (x(l.source) + 84 + (x(l.target) - x(l.source) - 84) / 2) + "," + y(l.target) + " " + (x(l.target) - 4) + "," + y(l.target);',
-  '    });',
-  '  edge.append("text")',
-  '    .attr("x", function (l) { return (x(l.source) + x(l.target)) / 2; })',
-  '    .attr("y", function (l) { return (y(l.source) + y(l.target)) / 2 - 6; })',
-  '    .attr("text-anchor", "middle").attr("font-size", "10px").attr("fill", "#8b96a5")',
-  '    .text(function (l) { return l.kind; });',
-  '  const node = g.append("g").selectAll("g").data(gi.nodes).join("g")',
-  '    .attr("transform", function (n) { return "translate(" + x(n.id) + "," + (y(n.id) - 16) + ")"; })',
-  '    .style("cursor", "pointer")',
-  '    .on("click", function (event, n) { showDetail(n.id); });',
-  '  node.append("rect").attr("width", 168).attr("height", 32).attr("rx", 5)',
-  '    .attr("fill", function (n) { return KIND[n.kind] || "#999"; })',
-  '    .attr("stroke", function (n) { return statusColor(n.verdict); })',
-  '    .attr("stroke-width", function (n) { return n.verdict !== "unreviewed" ? 1.5 : 0; });',
-  '  node.append("text").attr("x", 8).attr("y", 20).attr("font-size", "11px")',
-  '    .text(function (n) { return n.kind + " " + trunc(n.label, 40); })',
-  '    .append("title").text(function (n) { return n.kind + ": " + n.label; });',
-  '  node.append("text").attr("x", 8).attr("y", 40).attr("font-size", "10px").attr("fill", "#0c0f14")',
-  '    .text(function (n) { return n.verdict; });',
-  '}',
-  'function trunc(s, n) { s = String(s || ""); return s.length > n ? s.slice(0, n - 1) + "…" : s; }',
-  '',
-  '// ---------- source lists (open questions / related papers) ----------',
-  'function renderSourceLists(gi) {',
-  '  const box = el("graph-lists");',
-  '  let html = "";',
-  '  html += "<div class=\\"ov-list\\"><h3>Open questions</h3><ul>";',
-  '  if (!gi.openQuestions.length) html += "<li>None.</li>";',
-  '  gi.openQuestions.forEach(function (q) {',
-  '    html += "<li><a href=\\"#\\" onclick=\\"showDetail(" + q.id + ");return false;\\">[" + q.id + "]</a> " + escapeHtml(q.statement) + " <em>(" + q.verdict + ")</em></li>";',
-  '  });',
-  '  html += "</ul></div><div class=\\"ov-list\\"><h3>Related papers</h3><ul>";',
-  '  if (!gi.relatedPapers.length) html += "<li>None.</li>";',
-  '  gi.relatedPapers.forEach(function (r) {',
-  '    html += "<li><a href=\\"#\\" onclick=\\"showDetail(" + r.id + ");return false;\\">[" + r.id + "]</a> " + escapeHtml(r.title) + " <em>(" + r.relationship + ", " + r.verdict + ")</em></li>";',
-  '  });',
-  '  html += "</ul></div>";',
-  '  box.innerHTML = html;',
-  '}',
-  'function renderGraphMeta(gi) {',
-  '  const box = el("graph-meta");',
-  '  let html = "<h2>" + escapeHtml(short(gi.title)) + "</h2>";',
-  '  if (gi.url) html += "<div class=\\"v\\"><a href=\\"" + gi.url + "\\">" + gi.url + "</a></div>";',
-  '  if (gi.paperKey) html += "<div class=\\"row\\"><div class=\\"k\\">paper</div><div class=\\"v\\">" + gi.paperKey + "</div></div>";',
-  '  if (gi.contentHash) html += "<div class=\\"row\\"><div class=\\"k\\">snapshot</div><div class=\\"v\\">" + String(gi.contentHash).slice(0, 12) + "</div></div>";',
-  '  if (gi.match) html += "<div class=\\"row\\"><div class=\\"k\\">match</div><div class=\\"v\\">" + gi.match.level + " — " + escapeHtml(gi.match.reason || "") + "</div></div>";',
-  '  if (gi.matchReview) html += "<div class=\\"row\\"><div class=\\"k\\">match review</div><div class=\\"v\\">" + gi.matchReview.verdict + " — " + escapeHtml(gi.matchReview.reason || "") + "</div></div>";',
-  '  if (gi.rejected) html += "<div class=\\"row\\"><div class=\\"k\\">rejected links</div><div class=\\"v\\">" + gi.rejected + "</div></div>";',
-  '  box.innerHTML = html;',
-  '}',
-  'function selectSource() {',
-  '  const sel = el("source-select");',
-  '  const gi = DATA.graphs[Number(sel.value)];',
-  '  renderGraph(gi);',
-  '  renderGraphMeta(gi);',
-  '  renderSourceLists(gi);',
-  '}',
-  '',
-  '// ---------- tabs ----------',
-  'function show(view) {',
-  '  el("tree-panel").style.display = view === "tree" ? "" : "none";',
-  '  el("graph-panel").style.display = view === "graph" ? "" : "none";',
-  '  el("graph-controls").style.display = view === "graph" ? "" : "none";',
-  '  el("tab-tree").className = view === "tree" ? "active" : "";',
-  '  el("tab-graph").className = view === "graph" ? "active" : "";',
-  '}',
-  '',
-  '// ---------- boot ----------',
-  'function boot() {',
-  '  el("question").textContent = DATA.run.question;',
-  '  el("meta").textContent = "status " + DATA.run.status + " · " + DATA.stats.sources + " sources · " + DATA.stats.model_calls + " model calls · " + DATA.stats.tokens_reported + " tokens · " + DATA.stats.elapsed_ms + " ms";',
-  '  const sel = el("source-select");',
-  '  DATA.graphs.forEach(function (g, i) {',
-  '    const o = document.createElement("option");',
-  '    o.value = String(i);',
-  '    o.textContent = "[" + (g.sourceId) + "] " + trunc(g.title, 50);',
-  '    sel.appendChild(o);',
-  '  });',
-  '  initTree();',
-  '  show("tree");',
-  '  if (DATA.graphs.length) selectSource();',
-  '  el("tab-tree").onclick = function () { show("tree"); };',
-  '  el("tab-graph").onclick = function () { show("graph"); };',
-  '  sel.onchange = selectSource;',
-  '}',
-  'document.addEventListener("DOMContentLoaded", boot);',
-].join("\n");
+`;
 
 export function buildView(store) {
   const run = store.run();
@@ -387,6 +78,7 @@ export function buildView(store) {
     url: s.url,
     paper_key: s.paper_key,
     content_hash: s.content_hash,
+    body: s.body,
   }));
   const tree = store.tree();
   const stats = store.stats();
@@ -395,7 +87,6 @@ export function buildView(store) {
     stats,
     sources,
     tree,
-    graphs: buildGraphs(tree),
   };
 
   return [
@@ -410,21 +101,20 @@ export function buildView(store) {
     "<body>",
     '<header><h1 id="question"></h1><div class="meta" id="meta"></div></header>',
     '<div id="toolbar">',
-    '<button id="tab-tree">Tree</button>',
-    '<button id="tab-graph">Graph</button>',
-    '<span id="graph-controls" style="display:none"><select id="source-select"></select></span>',
-    '<span class="hint">click a node label for detail · click a circle to collapse</span>',
+    '<span class="section-title">Tree</span>',
+    '<span><button id="expand-all">Expand all</button> <button id="collapse-all">Paper overview</button></span>',
+    '<span id="zoom-controls" aria-label="Tree zoom controls"><button id="zoom-out" title="Zoom out" aria-label="Zoom out">−</button><button id="zoom-reset" title="Reset zoom"><span id="zoom-level">100%</span></button><button id="zoom-in" title="Zoom in" aria-label="Zoom in">+</button></span>',
+    '<span class="hint">Scroll to zoom · press the mouse wheel and drag to pan</span>',
     "</div>",
     '<div id="main">',
     '<div id="stage">',
+    '<div class="canvas-help-wrap"><div class="canvas-help">Scroll wheel: zoom · Hold mouse wheel + drag: pan</div></div>',
     '<div id="tree-panel"><svg id="tree-svg"></svg></div>',
-    '<div id="graph-panel" style="display:none"><svg id="graph-svg"></svg></div>',
     "</div>",
-    '<aside id="detail"><div id="graph-meta"></div><div id="graph-lists"></div></aside>',
+    '<aside id="detail" aria-label="Selected node details"><div id="selection-detail" aria-live="polite"></div></aside>',
     "</div>",
-    '<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>',
     "<script>",
-    JS.replace("__RESEARCH_DATA__", escapeJson(data)),
+    "var DATA = " + escapeJson(data) + ";\n(" + mountView.toString() + ")(DATA);",
     "</script>",
     "</body>",
     "</html>",

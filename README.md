@@ -1,39 +1,45 @@
 ## feynman's prism
-better feature representation of the feynman autoresearch agent
+- better feature representation of the feynman autoresearch agent during research process
+- also includes a torrent client within a pear-to-pear network
 
 ![](via-egnatia.png)
+![](torrent-peers.png)
 
 
-## setup
+## features
+0) a p2p network
+pears can join the network to solve open problems from emergent mind, resembling a webtorrent client.
+- initial pears are randomly named, i.e. aman, guillefix, alex, yoyo, lucy
+- subsequent pears: aayush, sudarsh, lev, celeste, ada, lydia, malaika, pavrati, yudhister, amir, ihar, gwern
+
+a thin terminal wireframe client lives in `torrent/` (`tui.mjs`). each process is
+one randomly-named pear that joins the shared `pears` hyperswarm room and gossips
+which open problems it's joined. peer counts, join state, and token counts render
+in a box-drawn wireframe; "who joined what" streams below it.
+
+```bash
+cd torrent
+npm install
+npm run pear          # one pear (random name), interactive wireframe
+npm run spawn         # open 5 Terminal.app windows, one pear each (macOS)
+```
+
+or directly:
+
+```bash
+node torrent/tui.mjs pears                            # random name
+node torrent/tui.mjs pears aman credit-assignment     # force a name, auto-join a problem
+```
+
+keys: `j`/`k` or arrows move · `space` join/pause · `enter` expand a problem · `q` quit.
+the problem roster and token counts come from `torrent/data.mjs`.
+
+
+1) a simple ct viewer to sanity check downloaded ct in `acoustics/`
 install [uv](https://docs.astral.sh/uv/), then:
 ```
 uv sync
 ```
-
-
-## quickstart
-
-For the one-question, SQLite-backed research tree:
-
-```bash
-node tools/research/cli.mjs --help
-```
-
-The executor uses Feynman's model and paper-retrieval libraries directly. ACO
-selects research actions; papers, central arguments, open questions, and related
-papers are stored as an appendable tree with stable node IDs. See
-[setup, running, and appending analysis](tools/research/README.md).
-
-Inspect the completed development tree:
-
-```bash
-node tools/research/cli.mjs tree --db tools/outputs/credit-assignment-passages.sqlite
-```
-
-
-## tools
-1) a simple ct viewer to sanity check downloaded ct in `acoustics/`
-
 `uv run python acoustics/view_ct.py`
 
 keys: `z` axial, `y` coronal, `x` sagittal (key = scrubbed axis)
@@ -76,6 +82,26 @@ just test                             # run the test suite
 just lint                             # ruff check + format
 ```
 
+## setup
+
+## quickstart
+
+For the one-question, SQLite-backed research tree:
+
+```bash
+node tools/research/cli.mjs --help
+```
+
+The executor uses Feynman's model and paper-retrieval libraries directly. ACO
+selects research actions; papers, central arguments, open questions, and related
+papers are stored as an appendable tree with stable node IDs. See
+[setup, running, and appending analysis](tools/research/README.md).
+
+Inspect the completed development tree:
+
+```bash
+node tools/research/cli.mjs tree --db tools/outputs/credit-assignment-passages.sqlite
+```
 
 ## to stop a script
 `pkill -f view_ct.py`

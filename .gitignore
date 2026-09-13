@@ -4,3 +4,4 @@ __pycache__/
 *.pyc
 tools/outputs/
 autoresearch/runs/
+node_modules/

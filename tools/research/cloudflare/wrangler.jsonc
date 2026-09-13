@@ -1,0 +1,8 @@
+{
+  "name": "feynmans-prism-credit-assignment",
+  "compatibility_date": "2025-06-01",
+  "workers_dev": true,
+  "assets": {
+    "directory": "../../outputs/prism-site"
+  }
+}

@@ -3,11 +3,13 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Script } from "node:vm";
 import { Store, DEFAULTS, hash } from "../tools/research/store.mjs";
 import { execute, applyResponse, exportCorpus, corpusBackend } from "../tools/research/engine.mjs";
 import { chooseAction } from "../tools/research/scheduler.mjs";
 import { validateExtraction, validateReview, reviewItems, selectPassages } from "../tools/research/evidence.mjs";
 import { renderAnswer } from "../tools/research/render.mjs";
+import { buildView } from "../tools/research/view.mjs";
 import { paperKey, contentText } from "../tools/research/runtime.mjs";
 import { articleText, publicRetrieval } from "../tools/research/public-retrieval.mjs";
 
@@ -271,4 +273,43 @@ test("public retrieval keeps only article content and preserves math as LaTeX", 
   const fetched = await retrieval.fetch({ paper_key: "2609.00001" });
   assert.equal(fetched.text, text);
   assert.ok(urls.every((url) => !url.includes("emergentmind")));
+});
+
+test("view renders a self-contained, zoomable tree without alternate views", async (t) => {
+  const { store } = setup(t);
+  await execute(store, backend());
+  const html = buildView(store);
+  assert.ok(html.startsWith("<!doctype html>"));
+  assert.ok(html.includes("<svg id=\"tree-svg\">"));
+  assert.ok(html.includes('id="zoom-in"'));
+  assert.ok(html.includes('id="zoom-out"'));
+  assert.ok(html.includes('id="zoom-reset"'));
+  assert.ok(html.includes("Scroll wheel: zoom"));
+  assert.ok(html.includes("Hold mouse wheel + drag: pan"));
+  assert.ok(!html.includes('id="tab-graph"'));
+  assert.ok(!html.includes('id="graph-svg"'));
+  assert.ok(!html.includes("cdn.jsdelivr.net"));
+  assert.ok(!html.includes("__RESEARCH_DATA__"));
+  const match = html.match(/var DATA = (.*?);\n/);
+  assert.ok(match);
+  const data = JSON.parse(match[1]);
+  assert.equal(data.tree.children.length, 2);
+  assert.equal(data.sources[0].body, body, "standalone view includes the source snapshot for evidence excerpts");
+  new Script(html.match(/<script>\n([\s\S]*?)\n<\/script>/)[1]);
+});
+
+test("view preserves evidence anchors and safely embeds source and node text", async (t) => {
+  const { store } = setup(t);
+  await execute(store, backend());
+  const hostile = '</script><img src=x onerror="alert(1)">';
+  store.append(store.tree().id, hostile, hostile);
+  const html = buildView(store);
+  assert.ok(!html.includes(hostile), "node content cannot escape the data script");
+  const data = JSON.parse(html.match(/var DATA = (.*?);\n/)[1]);
+  const assumption = data.tree.children[0].children[0].children.find((n) => n.kind === "assumption");
+  const ev = assumption.data.evidence;
+  const source = data.sources.find((s) => s.id === ev.source_id);
+  assert.equal(source.content_hash, ev.content_hash);
+  assert.equal(source.body.slice(ev.start, ev.end), quote);
+  assert.equal(data.tree.children.at(-1).label, hostile);
 });
