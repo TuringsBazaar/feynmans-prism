@@ -1,0 +1,168 @@
+// LLM persona pear: joins a room, reads the chat, replies in character.
+// Port of pear-to-pear/deepseek-agent.mjs. Speaks the shared "[Name] text"
+// chat format and ignores the pear's control lines.
+//
+//   pnpm agent -- <persona> [--room pears]
+//
+// Personas live in ../../PEARS.md. The "stirrer" walks the problem list from
+// ../src/data.ts. Requires an OpenRouter key: OPENROUTER_API_KEY, or the key in
+// ~/.local/share/opencode/auth.json. Model: PEAR_MODEL (default below).
+
+import { existsSync, readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
+import { PROBLEMS } from '../src/data.ts'
+import { DEFAULT_ROOM, flagString, openRoom, parseFlags, peerId, readLines, writeAll } from '../src/room.ts'
+import { isControl } from '../src/wire.ts'
+import { loadPersonas } from '../src/personas.ts'
+
+const MODEL = process.env.PEAR_MODEL ?? 'deepseek/deepseek-v4-pro-0813'
+const MAX_HISTORY = 16
+const MIN_REPLY_INTERVAL_MS = 1500
+
+type Message = { role: 'system' | 'user' | 'assistant'; content: string }
+
+// ---- args ------------------------------------------------------------------
+
+const flags = parseFlags(process.argv.slice(2))
+const [personaKey, legacyRoom] = flags.positional // legacy: <persona> <room>
+const room = flagString(flags, 'room', legacyRoom ?? DEFAULT_ROOM)
+
+const personas = loadPersonas()
+const persona = personaKey ? personas[personaKey] : undefined
+if (!persona) {
+  console.error('Usage: pnpm agent -- <persona> [--room pears]')
+  console.error('Available:', Object.keys(personas).join(', '))
+  process.exit(1)
+}
+
+// ---- API key ---------------------------------------------------------------
+
+function loadApiKey(): string {
+  if (process.env.OPENROUTER_API_KEY) return process.env.OPENROUTER_API_KEY
+  const authFile = join(homedir(), '.local/share/opencode/auth.json')
+  if (existsSync(authFile)) {
+    try {
+      const key = JSON.parse(readFileSync(authFile, 'utf8'))?.openrouter?.key
+      if (key) return key
+    } catch {
+      // fall through
+    }
+  }
+  console.error('No OpenRouter key. Set OPENROUTER_API_KEY or log in with opencode.')
+  process.exit(1)
+}
+const apiKey = loadApiKey()
+
+// ---- chat plumbing ---------------------------------------------------------
+
+const knownTags = new Set(
+  Object.values(personas)
+    .filter((p) => !p.stir)
+    .map((p) => `[${p.name}]`),
+)
+
+function stripTags(text: string) {
+  let out = text.trim().replace(/^(\[[^\]]*\]\s*)+/, '')
+  for (const t of knownTags) out = out.split(t).join('')
+  return out.trim()
+}
+
+const { swarm, discovery } = openRoom(room)
+const history: Message[] = []
+let lastReply = 0
+let lastActivity = 0
+
+function pushHistory(role: Message['role'], content: string) {
+  history.push({ role, content })
+  if (history.length > MAX_HISTORY) history.shift()
+}
+
+async function ask(messages: Message[]): Promise<string> {
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'http://localhost',
+      'X-Title': 'feynmans-prism-pears',
+    },
+    body: JSON.stringify({ model: MODEL, messages, temperature: 0.8 }),
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${(await res.text()).slice(0, 300)}`)
+  const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> }
+  return (data.choices?.[0]?.message?.content ?? '').trim()
+}
+
+function broadcast(text: string) {
+  writeAll(swarm.connections, text + '\n')
+}
+
+function shouldReply(fromTag: string | null): boolean {
+  if (persona!.noReply) return false
+  if (persona!.replyTo?.length) return fromTag ? persona!.replyTo.includes(fromTag.slice(1, -1)) : false
+  return !fromTag
+}
+
+async function reply() {
+  try {
+    const clean = stripTags(await ask([{ role: 'system', content: persona!.system }, ...history]))
+    if (!clean) return
+    const tagged = `[${persona!.name}] ${clean}`
+    pushHistory('assistant', tagged)
+    broadcast(tagged)
+    console.log(`<${persona!.name}> ${clean}`)
+    lastActivity = Date.now()
+  } catch (err) {
+    console.error(`[${persona!.name}] error:`, (err as Error).message)
+  }
+}
+
+async function handleLine(raw: string) {
+  if (isControl(raw)) return
+  const line = raw.trim()
+  if (!line) return
+  lastActivity = Date.now()
+
+  const fromTag = [...knownTags].find((t) => line.startsWith(t)) ?? null
+  pushHistory(fromTag ? 'assistant' : 'user', line)
+  if (!shouldReply(fromTag)) return
+
+  const now = Date.now()
+  if (now - lastReply < MIN_REPLY_INTERVAL_MS) return
+  lastReply = now
+  await reply()
+}
+
+swarm.on('connection', (socket) => {
+  console.log(
+    `[${persona.name}] peer connected: ${peerId(socket).slice(0, 8)} (${swarm.connections.size} total)`,
+  )
+  readLines(socket, (line) => void handleLine(line))
+})
+
+await discovery.flushed()
+console.log(`[${persona.name}] joined room "${room}" as ${personaKey} (model ${MODEL})`)
+
+// ---- stirrer: walk the problem list when the room goes quiet ---------------
+
+if (persona.stir) {
+  const problems = PROBLEMS.map((p, i) => `PROBLEM ${i + 1}/${PROBLEMS.length} — ${p.statement}`)
+  const stirIdle = persona.stirIdleMs ?? 20000
+  let idx = 0
+  const stir = () => {
+    if (Date.now() - lastActivity < stirIdle) return
+    const p = problems[idx++ % problems.length]
+    const tagged = `[${persona.name}] ${p}`
+    pushHistory('user', tagged)
+    broadcast(tagged)
+    console.log(`<${persona.name}> ${p}`)
+    lastActivity = Date.now()
+  }
+  setTimeout(stir, 3000)
+  setInterval(stir, persona.stirEveryMs ?? 30000)
+}
+
+for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
+  process.once(sig, () => void swarm.destroy().then(() => process.exit(0)))
+}

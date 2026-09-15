@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react", "unicorn"],
+  "categories": { "correctness": "error", "suspicious": "warn" },
+  "env": { "node": true, "es2024": true },
+  "ignorePatterns": ["node_modules", "snapshots", "assets"],
+  "rules": {
+    "eslint/max-lines-per-function": ["error", { "max": 35 }],
+    "eslint/max-lines": ["error", { "max": 300 }],
+    "eslint/no-unused-vars": "error",
+    "eslint/no-empty": ["error", { "allowEmptyCatch": true }],
+    "react/react-in-jsx-scope": "off"
+  },
+  "overrides": [{ "files": ["scripts/guillefix.cjs"], "rules": { "eslint/max-lines-per-function": "off" } }]
+}

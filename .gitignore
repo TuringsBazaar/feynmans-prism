@@ -5,3 +5,4 @@ __pycache__/
 tools/outputs/
 autoresearch/runs/
 node_modules/
+.pnpm-store/

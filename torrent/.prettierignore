@@ -1,0 +1,6 @@
+node_modules
+snapshots
+assets
+pnpm-lock.yaml
+# upstream port, kept verbatim
+scripts/guillefix.cjs
