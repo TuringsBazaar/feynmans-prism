@@ -11,6 +11,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { createInterface } from 'node:readline'
 import { PROBLEMS } from '../src/data.ts'
 import { DEFAULT_ROOM, flagString, openRoom, parseFlags, peerId, readLines, writeAll } from '../src/room.ts'
 import { isControl } from '../src/wire.ts'
@@ -24,7 +25,8 @@ type Message = { role: 'system' | 'user' | 'assistant'; content: string }
 
 // ---- args ------------------------------------------------------------------
 
-const flags = parseFlags(process.argv.slice(2))
+const flags = parseFlags(process.argv.slice(2), ['manual'])
+const manual = flags.opts.manual === true
 const [personaKey, legacyRoom] = flags.positional // legacy: <persona> <room>
 const room = flagString(flags, 'room', legacyRoom ?? DEFAULT_ROOM)
 
@@ -53,6 +55,12 @@ function loadApiKey(): string {
   process.exit(1)
 }
 const apiKey = loadApiKey()
+persona.name = flagString(flags, 'name', persona.name)
+if (manual) {
+  persona.system +=
+    '\nWork only on the problem assigned by the human in this terminal. ' +
+    'You have no browsing or execution tools; distinguish proposals from verified results.'
+}
 
 // ---- chat plumbing ---------------------------------------------------------
 
@@ -138,15 +146,31 @@ swarm.on('connection', (socket) => {
   console.log(
     `[${persona.name}] peer connected: ${peerId(socket).slice(0, 8)} (${swarm.connections.size} total)`,
   )
-  readLines(socket, (line) => void handleLine(line))
+  readLines(socket, (line) => {
+    if (!manual) void handleLine(line)
+  })
 })
+
+if (manual) {
+  let queue = Promise.resolve()
+  const input = createInterface({ input: process.stdin, output: process.stdout })
+  input.on('line', (line) => {
+    if (!line.trim()) return
+    queue = queue.then(async () => {
+      pushHistory('user', line.trim())
+      await reply()
+      console.log('[' + persona.name + '] awaiting assignment — type a problem and press Enter')
+    })
+  })
+  console.log('[' + persona.name + '] awaiting assignment — type a problem and press Enter')
+}
 
 await discovery.flushed()
 console.log(`[${persona.name}] joined room "${room}" as ${personaKey} (model ${MODEL})`)
 
 // ---- stirrer: walk the problem list when the room goes quiet ---------------
 
-if (persona.stir) {
+if (persona.stir && !manual) {
   const problems = PROBLEMS.map((p, i) => `PROBLEM ${i + 1}/${PROBLEMS.length} — ${p.statement}`)
   const stirIdle = persona.stirIdleMs ?? 20000
   let idx = 0

@@ -6,6 +6,8 @@
 
 import { create } from 'zustand'
 import type { PeerSocket } from './room.ts'
+import type { CoordinatorLedger, PeerMetrics } from './fragments.ts'
+import { initLedger } from './fragments.ts'
 
 export interface Remote {
   name: string | null
@@ -38,6 +40,13 @@ export const remotes = new Map<string, Remote>()
 export const feed: FeedEntry[] = []
 const FEED_MAX = 60
 
+// Coordinator ledger: only populated if self.coordinator is true.
+export let coordinatorLedger: CoordinatorLedger | null = null
+
+export function initCoordinatorLedger(problemId: string) {
+  coordinatorLedger = initLedger(problemId)
+}
+
 // Terminal cursor and composer; only the UI writes these.
 export const ui = {
   cursor: 0,
@@ -47,8 +56,15 @@ export const ui = {
 }
 
 export const shortId = (id: string) => id.slice(0, 8)
-export const label = () => self.name ?? shortId(self.id)
-export const remoteLabel = (rid: string) => remotes.get(rid)?.name ?? shortId(rid)
+export const label = () => {
+  const hash = shortId(self.id)
+  return self.name ? `${hash} [${self.name}]` : hash
+}
+export const remoteLabel = (rid: string) => {
+  const hash = shortId(rid)
+  const name = remotes.get(rid)?.name
+  return name ? `${hash} [${name}]` : hash
+}
 
 // Other pears only — self is never counted here.
 export function peerCounts(): Record<string, number> {
@@ -69,11 +85,15 @@ export interface Snapshot {
   cursor: number
   expanded: string[]
   selfJoined: string[]
-  remotes: Record<string, { name: string | null; joined: string[] }>
+  remotes: Record<
+    string,
+    { name: string | null; joined: string[]; solveVelocity?: number; avgAmplification?: number }
+  >
   counts: Record<string, number>
   feed: FeedEntry[]
   composing: boolean
   draft: string
+  peerMetrics?: Record<string, PeerMetrics>
 }
 
 function coordinatorName(): string | null {
@@ -82,7 +102,7 @@ function coordinatorName(): string | null {
 }
 
 export function derive(): Snapshot {
-  return {
+  const snap: Snapshot = {
     name: self.name,
     coordinator: self.coordinator,
     coordinatorName: coordinatorName(),
@@ -91,13 +111,28 @@ export function derive(): Snapshot {
     expanded: [...ui.expanded],
     selfJoined: [...self.joined],
     remotes: Object.fromEntries(
-      [...remotes].map(([rid, r]) => [rid, { name: r.name, joined: [...r.joined] }]),
+      [...remotes].map(([rid, r]) => {
+        const metrics = coordinatorLedger?.peerMetrics.get(rid)
+        return [
+          rid,
+          {
+            name: r.name,
+            joined: [...r.joined],
+            solveVelocity: metrics?.solveVelocity,
+            avgAmplification: metrics?.avgAmplificationFactor,
+          },
+        ]
+      }),
     ),
     counts: peerCounts(),
     feed: [...feed],
     composing: ui.composing,
     draft: ui.draft,
   }
+  if (self.coordinator && coordinatorLedger) {
+    snap.peerMetrics = Object.fromEntries(coordinatorLedger.peerMetrics)
+  }
+  return snap
 }
 
 export const useStore = create<{ tick: number; data: Snapshot }>(() => ({ tick: 0, data: derive() }))

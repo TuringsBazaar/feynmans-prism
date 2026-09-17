@@ -26,6 +26,12 @@ pnpm -C torrent orchestrator -- 5        # a whole room at once, tiled in tmux
 pnpm -C torrent orchestrator -- stop
 ```
 
+For a DeepSeek pear that waits for your assignments, run
+`pnpm -C torrent agent -- aman --room manual-pears --name pear-1 --manual`.
+Type a problem in its terminal and press Enter; subsequent lines are follow-ups.
+Manual pears ignore room chat and never choose problems automatically. Use distinct
+names in separate terminals for independent assignments; `PEAR_MODEL` selects the model.
+
 ## all commands
 
 Run from the repo root. Hyperswarm commands take `--room <name>` to select a room.

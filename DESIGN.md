@@ -23,7 +23,7 @@ later:
 - reticulum for networking with other feynmans, python
 
 implementation status & notes:
-please refer to @STYLE.md for coding expectations
+please refer to @AGENT.md for coding expectations
 
 randomly name pears:
 - inital pears: aman, guillefix, alex, yoyo, lucy

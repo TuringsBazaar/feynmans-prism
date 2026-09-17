@@ -28,3 +28,36 @@ export function hello(): Control {
     since: self.since,
   }
 }
+
+export function submitFragment(problemId: string, subproblemId: string, content: string): Control {
+  return {
+    t: 'submit-fragment',
+    problemId,
+    subproblemId,
+    content,
+  }
+}
+
+export function reportVelocity(fragmentId: string, amplificationFactor: number): Control {
+  return {
+    t: 'report-velocity',
+    fragmentId,
+    amplificationFactor,
+  }
+}
+
+export function announceCompute(computeUnits: number, role: 'provider' | 'researcher' | 'hybrid'): Control {
+  return {
+    t: 'compute-provide',
+    computeUnits,
+    role,
+  }
+}
+
+export function announceAssignment(problemId: string, subproblemId: string): Control {
+  return {
+    t: 'assign-fragment',
+    problemId,
+    subproblemId,
+  }
+}

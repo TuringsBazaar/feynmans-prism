@@ -10,8 +10,7 @@
 - No authored source file may exceed 300 lines. Aim below 200 when the responsibilities divide naturally. The source-file check includes Astro, CSS, JavaScript, TypeScript, scripts, and tests.
 - Comments should be used to explain things that can’t be expressed in code, like the rationale for why a certain decision was made.
 - Agents can communicate with each other through a centralized discord channel
-- Agents can write to CHANGELOG.md and CONTEXT.md. Human will write to AGENT.me and DESIGN.md
-- Funding. Keep track of the token costs according to openrouter per day of development
+- As your context gets filled up, record changes made to CHANGELOG.md. add theoretical considerations or future questions to CONTEXT.md. Human will write to AGENT.md and DESIGN.md
 - Prefer mutually exclusive, collectively exhaustive domain boundaries. Be precise. Names should be borrowed from physics, cs, engineering or cognitive science.
 - Compare existing tools by features, complexity, community size and date published
 - Use `pnpm add` for TypeScript dependencies and `uv add` for Python dependencies.

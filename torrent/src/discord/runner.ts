@@ -25,6 +25,7 @@ export class Runner {
   ) {}
 
   async handle(id: string, owner: string, route: Route, send: Send) {
+    if (route.kind === 'room-command') return
     const session = this.store.session(id)
     if (route.command === 'help')
       return send(
@@ -41,7 +42,7 @@ export class Runner {
     if (route.command === 'resume') {
       if (session.owner !== owner || !session.prompt)
         return send('Only the original author can resume an existing request.')
-      route = { target: session.target, text: session.prompt }
+      route = { kind: 'agent', target: session.target, text: session.prompt }
     }
     if (!route.text) return send('Add a question after the mention or persona name. Use help for examples.')
     if (route.text.length > 6000) return send('Please keep each request under 6,000 characters.')
@@ -56,13 +57,13 @@ export class Runner {
     return `${this.store.session(id).status}${usage}`
   }
 
-  async start(id: string, owner: string, route: Route, send: Send) {
+  async start(id: string, owner: string, route: Route & { kind: 'agent' }, send: Send) {
     const session = this.store.session(id)
     const run = this.newRun()
     this.active.set(id, run)
     Object.assign(session, { owner, target: route.target, prompt: route.text, status: 'running' })
     this.store.save()
-    this.store.event('request', { thread: id, run: run.id, owner, ...route })
+    this.store.event('request', { thread: id, run: run.id, owner, target: route.target, text: route.text })
     try {
       await send(`**${this.personas[route.target].name}** · starting ${run.id.slice(0, 8)}`)
       if (route.target === 'chair') await this.orchestrate(id, route.text, run, send)

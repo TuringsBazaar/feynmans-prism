@@ -21,6 +21,10 @@ let helloGrace: NodeJS.Timeout | undefined
 // Keeps two back-to-back requests from popping the same entry.
 export const reserved = new Map<string, string>() // peerId → name
 
+// Timeout for waiting on coordinator to assign a name (5 seconds)
+const NAME_REQUEST_TIMEOUT_MS = 5000
+let nameRequestTimer: NodeJS.Timeout | undefined
+
 export function nameRank(name: string | null): number {
   if (name === null) return Number.POSITIVE_INFINITY
   const i = PEAR_NAMES.indexOf(name)
@@ -51,6 +55,8 @@ export function popFreeName(taken: Iterable<string | null> = takenNames()): stri
 export function setName(next: string, how: string) {
   const wasUnnamed = self.name === null
   self.name = next
+  if (nameRequestTimer) clearTimeout(nameRequestTimer)
+  nameRequestTimer = undefined
   broadcastControl(wasUnnamed ? hello() : { t: 'rename', name: next })
   logEvent(how)
   flushPendingJoin()
@@ -102,6 +108,18 @@ export function requestName() {
   if (self.fixedName || self.name !== null || self.coordinatorId === null) return
   const c = remotes.get(self.coordinatorId)
   if (c) sendControl(c.socket, { t: 'request-name' })
+
+  // Clear old timer if any
+  if (nameRequestTimer) clearTimeout(nameRequestTimer)
+
+  // Set timeout: if no name arrives, give up and stay unnamed (will show as hash only)
+  nameRequestTimer = setTimeout(() => {
+    nameRequestTimer = undefined
+    if (self.name === null) {
+      logEvent(`${shortId(self.id)} timed out waiting for name; using hash`)
+      notify()
+    }
+  }, NAME_REQUEST_TIMEOUT_MS)
 }
 
 // Deterministic election among everyone who speaks the protocol: lowest name

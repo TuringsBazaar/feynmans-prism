@@ -29,15 +29,20 @@ function fixture(t: TestContext, complete: Complete) {
 }
 
 test('routing supports aliases, sticky targets, controls and exact prefixes', () => {
-  assert.deepEqual(routeMessage('<@123> Aman: explain x', '123'), {
-    target: 'aman',
-    text: 'explain x',
-    command: undefined,
-  })
-  assert.equal(routeMessage('<@!123> why?', '123', 'gwern').target, 'gwern')
-  assert.equal(routeMessage('noera: new problem', '123', 'aman').target, 'chair')
-  assert.equal(routeMessage('chair: STOP', '123').command, 'stop')
-  assert.equal(routeMessage('stopping time theorem', '123').command, undefined)
+  const r1 = routeMessage('<@123> Aman: explain x', '123')
+  assert.equal(r1.kind, 'agent')
+  if (r1.kind === 'agent') {
+    assert.equal(r1.target, 'aman')
+    assert.equal(r1.text, 'explain x')
+  }
+  const r2 = routeMessage('<@!123> why?', '123', 'gwern')
+  assert.equal(r2.kind === 'agent' ? r2.target : null, 'gwern')
+  const r3 = routeMessage('noera: new problem', '123', 'aman')
+  assert.equal(r3.kind === 'agent' ? r3.target : null, 'chair')
+  const r4 = routeMessage('chair: STOP', '123')
+  assert.equal(r4.kind === 'agent' ? r4.command : null, 'stop')
+  const r5 = routeMessage('stopping time theorem', '123')
+  assert.equal(r5.kind === 'agent' ? r5.command : null, undefined)
   assert.equal(chunks('x'.repeat(4001)).join('').length, 4001)
   assert.ok(chunks('x'.repeat(4001)).every((chunk) => chunk.length <= 1900))
 })
@@ -59,9 +64,14 @@ test('chair runs two workers, includes representation in synthesis, and persists
     return result(prompts.length === 1 ? plan : `answer-${prompts.length}`)
   })
   const sent: string[] = []
-  await runner.handle('thread', 'human', { target: 'chair', text: 'investigate X' }, async (x) => {
-    sent.push(x)
-  })
+  await runner.handle(
+    'thread',
+    'human',
+    { kind: 'agent', target: 'chair', text: 'investigate X' },
+    async (x) => {
+      sent.push(x)
+    },
+  )
   assert.equal(prompts.length, 5)
   assert.match(prompts[4], /Representation:\nanswer-4/)
   assert.ok(sent.some((x) => x.startsWith('**Aman**')))
@@ -80,7 +90,12 @@ test('direct worker gets thread context without invoking the chair', async (t) =
     return result('critique')
   })
   store.remember('thread', 'aman', 'question', 'Aman hypothesis')
-  await runner.handle('thread', 'human', { target: 'gwern', text: 'critique Aman' }, async () => {})
+  await runner.handle(
+    'thread',
+    'human',
+    { kind: 'agent', target: 'gwern', text: 'critique Aman' },
+    async () => {},
+  )
   assert.equal(calls, 1)
   assert.equal(store.session('thread').target, 'gwern')
   assert.equal(store.session('other').history.gwern, undefined)
@@ -98,12 +113,22 @@ test('stop aborts pending workers and prevents synthesis; only owner can stop', 
   const send = async (x: string) => {
     sent.push(x)
   }
-  const running = runner.handle('thread', 'human', { target: 'chair', text: 'research' }, send)
+  const running = runner.handle('thread', 'human', { kind: 'agent', target: 'chair', text: 'research' }, send)
   await new Promise((resolve) => setImmediate(resolve))
   assert.equal(calls, 3)
-  await runner.handle('thread', 'other', { target: 'chair', text: 'stop', command: 'stop' }, send)
+  await runner.handle(
+    'thread',
+    'other',
+    { kind: 'agent', target: 'chair', text: 'stop', command: 'stop' },
+    send,
+  )
   assert.ok(sent.some((x) => x.includes('Only the person')))
-  await runner.handle('thread', 'human', { target: 'chair', text: 'stop', command: 'stop' }, send)
+  await runner.handle(
+    'thread',
+    'human',
+    { kind: 'agent', target: 'chair', text: 'stop', command: 'stop' },
+    send,
+  )
   await running
   assert.equal(calls, 3)
   assert.equal(store.session('thread').status, 'stopped')
@@ -130,10 +155,10 @@ test('a failed worker is disclosed in synthesis, and failed runs release the slo
     if (calls === 4) assert.match(messages[0].content, /gwern: FAILED/)
     return result('answer')
   })
-  await runner.handle('thread', 'human', { target: 'chair', text: 'research' }, async () => {})
+  await runner.handle('thread', 'human', { kind: 'agent', target: 'chair', text: 'research' }, async () => {})
   assert.equal(calls, 4)
   assert.match(store.session('thread').status, /^complete/)
-  await runner.handle('bad', 'human', { target: 'gwern', text: 'research' }, async () => {})
+  await runner.handle('bad', 'human', { kind: 'agent', target: 'gwern', text: 'research' }, async () => {})
   assert.match(store.session('bad').status, /^failed/)
   assert.equal(runner.active.size, 0)
 })

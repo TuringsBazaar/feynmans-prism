@@ -1,9 +1,34 @@
 # Changelog
 
-Newest first. One entry per stage; a stage ends with a README update and no
-automatic commit (see AGENT.md).
+Newest first, start with yyyy-mm-dd in title
 
-## 2026-09-14 — cognitive-complexity pass
+
+## 2026-09-16 — Tit for Tat system from BitTorrent, Validation metrics for research fragments and coordinator assignment
+
+**Solve Velocity & Amplification Factor:** Core mechanic to track peer productivity and research quality.
+- **Solve Velocity** (fragments/hour): measures how fast a peer churns through work
+- **Amplification Factor** (1.3x, etc): downstream speedup from a fragment; accumulates across submitted work
+- Replaces peer-review scoring; avoids the arxiv problem where reviewer scores ≠ paper quality
+
+**Wire protocol:** Added `submit-fragment`, `report-velocity`, `compute-provide`, `assign-fragment`, `chat` messages
+- Peers announce compute capacity; coordinator tracks in ledger
+- Fragments accumulated per contributor with amplification history
+- Assignment algorithm weights peers by velocity (10x) + amplification (5x); round-robin distribute work
+- Assignments announced so all peers see load distribution
+
+**Discord bot as "Recorder + Stirrer":**
+- Connects to Hyperswarm rooms; passively logs all fragment activity
+- Commands: `!record [N]` show last N events, `!stir <msg>` inject message, `!fragment-submit`, `!announce-compute`
+- Displays fragment submissions, velocity reports, compute announcements, peer joins in feed
+
+**Display fix:** Peers now show as `hash [name]` (e.g. `a1b2c3d4 [aman]`), or just hash if name unavailable
+- 5-second timeout on name requests so peers don't hang
+- Both hash and name displayed on join for clarity
+
+**Tests:** Dummy trees (problems 1–25 nodes), 3-peer scenarios, metric accumulation, scoring validation
+
+
+## 2026-09-14 — Introduced context through multiple docs, featuring ousterhout coding principles, reduced cognitive complexity, 
 
 Goal: any human or agent understands the repo in 30 seconds, and can torrent
 within 30 seconds of reading README.md. Rules applied: AGENT.md (≤35-line

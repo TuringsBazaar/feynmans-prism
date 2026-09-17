@@ -20,6 +20,11 @@ export type Control =
   | { t: 'leave'; name: string; problemId: string }
   | { t: 'request-name' } // member → coordinator
   | { t: 'assign'; name: string } // coordinator → member
+  | { t: 'compute-provide'; computeUnits: number; role: 'provider' | 'researcher' | 'hybrid' } // peer announces compute
+  | { t: 'submit-fragment'; problemId: string; subproblemId: string; content: string } // peer submits solution
+  | { t: 'report-velocity'; fragmentId: string; amplificationFactor: number } // peer reports downstream speedup
+  | { t: 'assign-fragment'; problemId: string; subproblemId: string } // peer announces assignment pickup
+  | { t: 'chat'; from: string; text: string } // broadcasted message (for Discord stirring)
 
 export type ControlOf<T extends Control['t']> = Extract<Control, { t: T }>
 

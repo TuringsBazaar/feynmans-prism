@@ -15,7 +15,13 @@ import {
 import { peerId, readLines, type PeerSocket } from './room.ts'
 import { hello, sendControl } from './send.ts'
 import { logChat, logEvent, notify, remoteLabel, remotes, self, shortId, type Remote } from './state.ts'
-import { parseChat, parseControl, type ControlOf } from './wire.ts'
+import { parseChat, parseControl, type Control, type ControlOf } from './wire.ts'
+import {
+  handleAssignmentPickup,
+  handleComputeProvide,
+  handleReportVelocity,
+  handleSubmitFragment,
+} from './fragments-handler.ts'
 
 export function onConnection(socket: PeerSocket) {
   const rid = peerId(socket)
@@ -30,11 +36,30 @@ export function onConnection(socket: PeerSocket) {
   socket.on('close', () => onClose(rid, socket))
 }
 
+function handleFragmentControl(msg: Partial<Control> & { t: string }, fromId: string) {
+  switch (msg.t) {
+    case 'compute-provide': {
+      const m = msg as ControlOf<'compute-provide'>
+      return handleComputeProvide(fromId, remoteLabel(fromId), m.computeUnits, m.role)
+    }
+    case 'submit-fragment': {
+      const m = msg as ControlOf<'submit-fragment'>
+      return handleSubmitFragment(m.problemId, m.subproblemId, m.content)
+    }
+    case 'report-velocity': {
+      const m = msg as ControlOf<'report-velocity'>
+      return handleReportVelocity(m.fragmentId, m.amplificationFactor)
+    }
+    case 'assign-fragment': {
+      const m = msg as ControlOf<'assign-fragment'>
+      return handleAssignmentPickup(m.problemId, m.subproblemId, fromId)
+    }
+  }
+}
+
 function onLine(rid: string, r: Remote, raw: string) {
   const msg = parseControl(raw)
   if (msg === null) {
-    // "[name] text" from a pear or an agent; anything else is an untagged line
-    // (e.g. from guillefix.cjs).
     const chat = parseChat(raw)
     if (chat) logChat(chat.from ?? remoteLabel(rid), chat.text)
     return
@@ -46,12 +71,14 @@ function onLine(rid: string, r: Remote, raw: string) {
       return onRename(rid, r, msg as ControlOf<'rename'>)
     case 'request-name':
       if (self.coordinator) assignName(rid, r.socket)
-      return // not the coordinator: ignore; the requester will hear the real one
+      return
     case 'assign':
       return onAssign(rid, msg as ControlOf<'assign'>)
     case 'join':
     case 'leave':
       return onMembership(rid, r, msg as ControlOf<'join' | 'leave'>)
+    default:
+      return handleFragmentControl(msg, rid)
   }
 }
 
