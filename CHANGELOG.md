@@ -3,6 +3,12 @@
 Newest first, start with yyyy-mm-dd in title
 
 
+## 2026-09-17 — One-command DeepSeek rooms
+
+- Added `just pears [count] [room]`, plus attach, restart, and stop recipes.
+- Extended the orchestrator with manual DeepSeek agents, named panes, and multiple windows for larger groups.
+- Validate counts, room names, and credentials before restart; reopen existing rooms without duplicating agents.
+
 ## 2026-09-16 — Tit for Tat system from BitTorrent, Validation metrics for research fragments and coordinator assignment
 
 **Solve Velocity & Amplification Factor:** Core mechanic to track peer productivity and research quality.

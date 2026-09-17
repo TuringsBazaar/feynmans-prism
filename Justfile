@@ -28,3 +28,23 @@ test:
 lint:
     uv run ruff check graphs tools tests
     uv run ruff format --check graphs tools tests
+
+# Start N DeepSeek pears waiting for manual assignments; reopen an existing room
+[positional-arguments]
+pears count="3" room="manual-pears":
+    @cd torrent && node --env-file-if-exists=.env.local --import tsx scripts/orchestrator.ts start "$1" --room "$2" --deepseek
+
+# Reopen a DeepSeek room
+[positional-arguments]
+pears-attach room="manual-pears":
+    @cd torrent && node --env-file-if-exists=.env.local --import tsx scripts/orchestrator.ts attach --room "$1" --deepseek
+
+# Restart a DeepSeek room with N pears (clears their conversation histories)
+[positional-arguments]
+pears-restart count="3" room="manual-pears":
+    @cd torrent && node --env-file-if-exists=.env.local --import tsx scripts/orchestrator.ts restart "$1" --room "$2" --deepseek
+
+# Stop a DeepSeek room
+[positional-arguments]
+pears-stop room="manual-pears":
+    @cd torrent && node --env-file-if-exists=.env.local --import tsx scripts/orchestrator.ts stop --room "$1" --deepseek

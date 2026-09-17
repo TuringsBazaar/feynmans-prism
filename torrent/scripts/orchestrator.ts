@@ -11,71 +11,116 @@
 // stop   kills the tmux session. Each pear receives SIGHUP, destroys its swarm
 //        and un-announces, so no ghost pears are left on the DHT.
 
-import { execFileSync, spawnSync } from 'node:child_process'
+import { spawnSync } from 'node:child_process'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { PROBLEMS } from '../src/data.ts'
+import { loadApiKey } from '../src/credentials.ts'
 import { DEFAULT_ROOM, flagString, parseFlags } from '../src/room.ts'
 
 const dir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-
-const flags = parseFlags(process.argv.slice(2), ['join', 'terminal'])
+const flags = parseFlags(process.argv.slice(2), ['join', 'terminal', 'deepseek'])
 const words = flags.positional.filter((w) => Number.isNaN(Number(w)))
 const numbers = flags.positional.filter((w) => !Number.isNaN(Number(w)))
 const command = words[0] ?? 'start'
-const count = numbers.length ? Number(numbers[0]) : 5
-const room = flagString(flags, 'room', DEFAULT_ROOM)
+const deepseek = flags.opts.deepseek === true
+const count = numbers.length ? Number(numbers[0]) : deepseek ? 3 : 5
+const room = flagString(flags, 'room', deepseek ? 'manual-pears' : DEFAULT_ROOM)
 const join = flags.opts.join === true
 const forceTerminal = flags.opts.terminal === true
-const session = `pears-${room}`
+const session = `${deepseek ? 'deepseek' : 'pears'}-${room}`
+let apiKey = ''
+
+function quote(value: string) {
+  return "'" + value.replaceAll("'", "'\\''") + "'"
+}
 
 function hasTmux() {
   return spawnSync('tmux', ['-V'], { stdio: 'ignore' }).status === 0
 }
 
+function exists() {
+  return spawnSync('tmux', ['has-session', '-t', `=${session}`], { stdio: 'ignore' }).status === 0
+}
+
 function tmux(...args: string[]) {
-  return execFileSync('tmux', args, { stdio: ['ignore', 'pipe', 'inherit'] })
-    .toString()
-    .trim()
+  const result = spawnSync('tmux', args, { encoding: 'utf8' })
+  if (result.status !== 0) throw new Error(result.stderr?.trim() || 'Could not run tmux')
+  return result.stdout.trim()
 }
 
 function pearCommand(i: number) {
-  const parts = ['pnpm', 'pear', '--', '--room', room]
-  if (i === 0) parts.push('--coordinator')
-  if (join) parts.push('--auto-join', PROBLEMS[i % PROBLEMS.length].id)
-  return parts.join(' ')
+  const parts = [process.execPath, '--env-file-if-exists=.env.local', '--import', 'tsx']
+  if (deepseek) {
+    parts.push('scripts/agent.ts', i % 2 ? 'gwern' : 'aman', '--name', `pear-${i + 1}`, '--manual')
+  } else {
+    parts.push('src/pear.tsx')
+    if (i === 0) parts.push('--coordinator')
+    if (join) parts.push('--auto-join', PROBLEMS[i % PROBLEMS.length].id)
+  }
+  return 'exec ' + [...parts, '--room', room].map(quote).join(' ')
+}
+
+function attach() {
+  const reconnect = deepseek ? `just pears-attach ${room}` : `tmux attach -t ${session}`
+  if (!exists()) throw new Error(`Room "${room}" is not running. Start it with: just pears 3 ${room}`)
+  console.log(`Room "${room}" is running. Attach: ${reconnect}`)
+  if (!process.stdin.isTTY || !process.stdout.isTTY) return
+  const action = process.env.TMUX ? 'switch-client' : 'attach-session'
+  const result = spawnSync('tmux', [action, '-t', `=${session}`], { stdio: 'inherit' })
+  if (result.status !== 0) throw new Error('Could not attach to the room')
+}
+
+function addPane(i: number) {
+  let args: string[]
+  if (i === 0) args = ['new-session', '-d', '-s', session, '-x', '220', '-y', '60']
+  else if (deepseek && i % 4 === 0) args = ['new-window', '-t', `${session}:`]
+  else args = ['split-window', '-t', session]
+  if (deepseek) {
+    args.push('-e', `OPENROUTER_API_KEY=${apiKey}`)
+    args.push('-e', `PEAR_MODEL=${process.env.PEAR_MODEL || 'deepseek/deepseek-v4-pro-0813'}`)
+  }
+  const pane = tmux(...args, '-P', '-F', '#{pane_id}', '-c', dir, pearCommand(i))
+  if (deepseek) tmux('select-pane', '-t', pane, '-T', `pear-${i + 1} · DeepSeek`)
+  tmux('select-layout', '-t', session, 'tiled')
+}
+
+function reopen() {
+  if (!deepseek)
+    throw new Error(`Session "${session}" already exists. Attach with: tmux attach -t ${session}`)
+  const current = Number(tmux('list-panes', '-s', '-t', session, '-F', '#{pane_id}').split('\n').length)
+  if (current !== count)
+    throw new Error(`Room has ${current} pears. Resize with: just pears-restart ${count} ${room}`)
+  attach()
 }
 
 function startTmux() {
-  if (spawnSync('tmux', ['has-session', '-t', session], { stdio: 'ignore' }).status === 0) {
-    console.error(
-      `tmux session "${session}" already exists — run \`stop\` first, or \`tmux attach -t ${session}\``,
-    )
-    process.exit(1)
+  if (exists()) return reopen()
+  try {
+    for (let i = 0; i < count; i++) {
+      // Stagger so the coordinator is announced before the members look for it.
+      if (i && !deepseek) spawnSync('sleep', ['0.3'])
+      addPane(i)
+    }
+    if (deepseek) {
+      tmux('set-option', '-t', session, 'mouse', 'on')
+      tmux('set-option', '-t', session, 'pane-border-status', 'top')
+      tmux('set-option', '-t', session, 'pane-border-format', ' #{pane_title} ')
+    }
+  } catch (error) {
+    spawnSync('tmux', ['kill-session', '-t', `=${session}`], { stdio: 'ignore' })
+    throw error
   }
-  tmux('new-session', '-d', '-s', session, '-c', dir, '-x', '220', '-y', '60', pearCommand(0))
-  for (let i = 1; i < count; i++) {
-    // Stagger so the coordinator is announced before the members look for it.
-    spawnSync('sleep', ['0.3'])
-    tmux('split-window', '-t', session, '-c', dir, pearCommand(i))
-    tmux('select-layout', '-t', session, 'tiled')
-  }
-  console.log(`started ${count} pears in tmux session "${session}" (room "${room}")`)
-  console.log(`  attach:  tmux attach -t ${session}`)
-  console.log(`  stop:    pnpm orchestrator -- stop --room ${room}`)
-  if (process.stdout.isTTY) {
-    const r = spawnSync('tmux', ['attach', '-t', session], { stdio: 'inherit' })
-    process.exit(r.status ?? 0)
-  }
+  console.log(`Started ${count} ${deepseek ? 'DeepSeek ' : ''}pears in room "${room}".`)
+  if (deepseek) console.log('Click a pane, type its problem, and press Enter. Ctrl+B then D detaches.')
+  else console.log(`Stop: pnpm orchestrator -- stop --room ${room}`)
+  attach()
 }
 
 function startTerminal() {
-  if (process.platform !== 'darwin') {
-    console.error('no tmux found and --terminal fallback is macOS-only. Install tmux: brew install tmux')
-    process.exit(1)
-  }
+  if (process.platform !== 'darwin') throw new Error('Install tmux to run rooms on this platform.')
   for (let i = 0; i < count; i++) {
-    const shell = `cd ${JSON.stringify(dir)} && ${pearCommand(i)}`
+    const shell = `cd ${quote(dir)} && ${pearCommand(i)}`
     const script = `tell application "Terminal" to do script ${JSON.stringify(shell)}`
     const r = spawnSync('osascript', ['-e', script], { stdio: 'ignore' })
     if (r.status !== 0) console.error(`failed to open Terminal window ${i + 1}`)
@@ -85,21 +130,37 @@ function startTerminal() {
 }
 
 function stop() {
-  const r = spawnSync('tmux', ['kill-session', '-t', session], { stdio: 'ignore' })
-  if (r.status === 0) console.log(`stopped tmux session "${session}"`)
-  else console.log(`no tmux session "${session}". Stray pears? try: pkill -f pear.tsx`)
+  if (exists()) {
+    tmux('kill-session', '-t', `=${session}`)
+    console.log(`Stopped room "${room}".`)
+  } else console.log(`Room "${room}" is not running.`)
 }
 
-if (command === 'stop') stop()
-else if (command === 'start') {
-  if (!forceTerminal && hasTmux()) startTmux()
-  else {
-    if (!forceTerminal) console.log('tmux not found (brew install tmux) — falling back to Terminal windows')
-    startTerminal()
+function validate() {
+  if (!['start', 'stop', 'restart', 'attach'].includes(command) || words.length > 1 || numbers.length > 1)
+    throw new Error('Usage: orchestrator [start|restart|attach|stop] [N] [--room name] [--deepseek]')
+  if (!Number.isSafeInteger(count) || count < 1) throw new Error('Pear count must be a positive integer.')
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(room))
+    throw new Error('Room names must use 1–64 letters, numbers, hyphens, or underscores.')
+  if (deepseek && (join || forceTerminal)) throw new Error('DeepSeek rooms use tmux and manual assignments.')
+  if (deepseek && !hasTmux()) throw new Error('Install tmux to start a DeepSeek room.')
+  if (deepseek && ['start', 'restart'].includes(command)) {
+    apiKey = loadApiKey()
+    if (process.env.PEAR_MODEL && !process.env.PEAR_MODEL.startsWith('deepseek/'))
+      throw new Error('PEAR_MODEL must select a deepseek/ model for DeepSeek rooms.')
   }
-} else {
-  console.error(
-    `unknown command "${command}". Usage: orchestrator [start|stop] [N] [--room r] [--join] [--terminal]`,
-  )
-  process.exit(1)
+}
+
+try {
+  validate()
+  if (command === 'stop') stop()
+  else if (command === 'attach') attach()
+  else {
+    if (command === 'restart') stop()
+    if (!forceTerminal && hasTmux()) startTmux()
+    else startTerminal()
+  }
+} catch (error) {
+  console.error((error as Error).message)
+  process.exitCode = 1
 }

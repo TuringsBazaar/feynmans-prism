@@ -26,11 +26,21 @@ pnpm -C torrent orchestrator -- 5        # a whole room at once, tiled in tmux
 pnpm -C torrent orchestrator -- stop
 ```
 
-For a DeepSeek pear that waits for your assignments, run
-`pnpm -C torrent agent -- aman --room manual-pears --name pear-1 --manual`.
-Type a problem in its terminal and press Enter; subsequent lines are follow-ups.
-Manual pears ignore room chat and never choose problems automatically. Use distinct
-names in separate terminals for independent assignments; `PEAR_MODEL` selects the model.
+Start DeepSeek pears with one command from the repo root (requires `just` and `tmux`):
+
+```bash
+just pears 3 lab          # start or reopen 3 pears in room lab
+just pears-attach lab     # reconnect
+just pears-restart 5 lab  # restart with 5 pears; clears conversation histories
+just pears-stop lab      # stop the room
+```
+
+`just pears` defaults to 3 pears in `manual-pears`. Click a pane, type its problem,
+and press Enter; subsequent lines are follow-ups. Ctrl+B then D leaves the room
+running. Larger groups use up to four panes per tmux window; click the window
+name in the bottom bar to switch. Pears wait for manual assignments and ignore
+room chat. Set `OPENROUTER_API_KEY` in `torrent/.env.local` or use your saved
+opencode login. `PEAR_MODEL` optionally selects another `deepseek/` model.
 
 ## all commands
 

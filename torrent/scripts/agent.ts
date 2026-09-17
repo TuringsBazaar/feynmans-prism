@@ -8,9 +8,7 @@
 // ../src/data.ts. Requires an OpenRouter key: OPENROUTER_API_KEY, or the key in
 // ~/.local/share/opencode/auth.json. Model: PEAR_MODEL (default below).
 
-import { existsSync, readFileSync } from 'node:fs'
-import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { loadApiKey } from '../src/credentials.ts'
 import { createInterface } from 'node:readline'
 import { PROBLEMS } from '../src/data.ts'
 import { DEFAULT_ROOM, flagString, openRoom, parseFlags, peerId, readLines, writeAll } from '../src/room.ts'
@@ -40,20 +38,6 @@ if (!persona) {
 
 // ---- API key ---------------------------------------------------------------
 
-function loadApiKey(): string {
-  if (process.env.OPENROUTER_API_KEY) return process.env.OPENROUTER_API_KEY
-  const authFile = join(homedir(), '.local/share/opencode/auth.json')
-  if (existsSync(authFile)) {
-    try {
-      const key = JSON.parse(readFileSync(authFile, 'utf8'))?.openrouter?.key
-      if (key) return key
-    } catch {
-      // fall through
-    }
-  }
-  console.error('No OpenRouter key. Set OPENROUTER_API_KEY or log in with opencode.')
-  process.exit(1)
-}
 const apiKey = loadApiKey()
 persona.name = flagString(flags, 'name', persona.name)
 if (manual) {

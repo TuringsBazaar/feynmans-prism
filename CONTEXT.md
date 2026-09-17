@@ -12,6 +12,8 @@ sept 1 - sept 14:
 - the credit assignment from emergent mind was broken down into a tree
 - the peers shall receive fragments of the problem statements from the tree
 
+sept 16:
+- there are some issues with the protocols I just implemented and basic singular autoresearch behaviour stripping away the command runners and protocols. personas seem not active
 
 here are the scrap notes that I took:
 A distributed network of Feynmans worldwide churning on open research questions from emergent mind. Someone could get a feynman “torrent client”. e.g. Ihar, who is geographically limited but has tenstorrent hardware. And he gets assigned particular problem fragments.
