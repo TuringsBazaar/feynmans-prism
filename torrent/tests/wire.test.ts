@@ -16,7 +16,7 @@ describe('wire', () => {
   })
 
   it('accepts bare JSON control lines from older clients', () => {
-    assert.deepEqual(parseControl('{"t":"request-name"}'), { t: 'request-name' })
+    assert.deepEqual(parseControl('{"t":"rename","name":"Diana"}'), { t: 'rename', name: 'Diana' })
   })
 
   it('treats non-JSON and JSON without t as chat', () => {

@@ -18,7 +18,7 @@ const room = flagString(flags, 'room', DEFAULT_ROOM)
 const everySec = Number(flagString(flags, 'every', '30'))
 
 const snapshotDir = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'snapshots')
-const { swarm, discovery } = openRoom(room)
+const pears = openRoom(room)
 const transcript: Array<{ at: string; from: string; text: string }> = []
 let written = 0
 let stopped = false
@@ -39,7 +39,7 @@ function snapshot() {
     `# ${room} — transcript\n\n` +
     `- Captured: ${now.toISOString()}\n` +
     `- Messages: ${transcript.length}\n` +
-    `- Peers connected now: ${swarm.connections.size}\n\n` +
+    `- Peers connected now: ${pears.connections.size}\n\n` +
     `${body}\n`
   const file = join(snapshotDir, `${room}-${stamp}.md`)
   writeFileSync(file, contents)
@@ -48,25 +48,25 @@ function snapshot() {
   console.log(`snapshot: ${file}`)
 }
 
-swarm.on('connection', (socket) => {
+pears.on('connection', (socket) => {
   const id = peerId(socket).slice(0, 8)
-  console.log(`peer connected: ${id} (${swarm.connections.size} total)`)
+  console.log(`peer connected: ${id} (${pears.connections.size} total)`)
   readLines(socket, (line) => {
     if (isControl(line)) return
     const chat = parseChat(line)
     if (chat) record(chat.from ?? id, chat.text)
   })
-  socket.on('close', () => console.log(`peer disconnected: ${id} (${swarm.connections.size} total)`))
+  socket.on('close', () => console.log(`peer disconnected: ${id} (${pears.connections.size} total)`))
 })
 
-await discovery.flushed()
+await pears.ready()
 console.log(`transcript for room "${room}" → ${snapshotDir} (every ${everySec}s, and on exit)`)
 
 const stdin = createInterface({ input: process.stdin })
 stdin.on('line', (line) => {
   if (!line.trim()) return
-  if (!swarm.connections.size) return console.log('no peers connected; not sent')
-  writeAll(swarm.connections, encodeChat('scribe', line))
+  if (!pears.connections.size) return console.log('no peers connected; not sent')
+  writeAll(pears.connections, encodeChat('scribe', line))
   record('scribe', line)
 })
 stdin.on('error', () => {})
@@ -79,7 +79,7 @@ async function stop() {
   clearInterval(timer)
   stdin.close()
   snapshot()
-  await swarm.destroy()
+  await pears.close()
   process.exit(0)
 }
 for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) process.once(sig, () => void stop())

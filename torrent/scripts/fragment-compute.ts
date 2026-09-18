@@ -20,15 +20,15 @@ if (!unitsStr || isNaN(Number(unitsStr))) {
 const computeUnits = Number(unitsStr)
 const role = (flagString(flags, 'role', 'researcher') as 'provider' | 'researcher' | 'hybrid') || 'researcher'
 const room = flagString(flags, 'room', DEFAULT_ROOM)
-const { swarm, discovery } = openRoom(room)
+const pears = openRoom(room)
 
-swarm.on('connection', (socket) => {
+pears.on('connection', (socket) => {
   readLines(socket, (line) => {
     if (!isControl(line)) console.log(line)
   })
 })
 
-await discovery.flushed()
+await pears.ready()
 await sleep(1000)
 
 const msg = encodeControl({
@@ -37,14 +37,14 @@ const msg = encodeControl({
   role,
 })
 
-const n = swarm.connections.size
+const n = pears.connections.size
 if (n === 0) {
   console.log(`no coordinator in room "${room}" yet`)
 } else {
-  writeAll(swarm.connections, msg)
+  writeAll(pears.connections, msg)
   console.log(`>> announced ${computeUnits} units (${role}) to ${n} node${n === 1 ? '' : 's'}`)
 }
 
 await sleep(2000)
-await swarm.destroy()
+await pears.close()
 process.exit(0)

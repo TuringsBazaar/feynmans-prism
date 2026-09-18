@@ -8,8 +8,10 @@
 //        each pear a different problem via --auto-join (round-robin).
 //        Default: one tmux session named after the room, tiled panes.
 //        --terminal (or no tmux installed): one macOS Terminal window each.
-// stop   kills the tmux session. Each pear receives SIGHUP, destroys its swarm
-//        and un-announces, so no ghost pears are left on the DHT.
+// stop   kills the tmux session. Each pear receives SIGHUP and closes its
+//        sockets, so no ghost pears keep answering dials.
+// Pear #i keeps its identity in .pears/<room>/<i> so names and, later,
+// receipts survive a restart of the room.
 
 import { spawnSync } from 'node:child_process'
 import { dirname, resolve } from 'node:path'
@@ -54,7 +56,7 @@ function pearCommand(i: number) {
   if (deepseek) {
     parts.push('scripts/agent.ts', i % 2 ? 'gwern' : 'aman', '--name', `pear-${i + 1}`, '--manual')
   } else {
-    parts.push('src/pear.tsx')
+    parts.push('src/pear.tsx', '--home', `.pears/${room}/${i}`)
     if (i === 0) parts.push('--coordinator')
     if (join) parts.push('--auto-join', PROBLEMS[i % PROBLEMS.length].id)
   }

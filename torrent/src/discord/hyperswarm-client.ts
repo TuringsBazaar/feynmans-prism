@@ -1,10 +1,24 @@
 // Discord bot's connection to a Hyperswarm room. Listens for fragment activity
 // and peer events, records them, and can inject messages back into the swarm.
 
-import Hyperswarm from 'hyperswarm'
-import { peerId, readLines, writeAll, type PeerSocket } from '../room.ts'
+import Hyperswarm, { type PeerSocket } from 'hyperswarm'
+import { createInterface } from 'node:readline'
 import { parseChat, parseControl, type Control } from '../wire.ts'
 import { encodeControl } from '../wire.ts'
+
+// Still on Hyperswarm while the pear moved to room.ts; to be ported with the
+// Discord rewrite. These three helpers are the old room.ts ones.
+const peerId = (socket: PeerSocket) => socket.remotePublicKey.toString('hex')
+function readLines(socket: PeerSocket, onLine: (line: string) => void) {
+  const rl = createInterface({ input: socket })
+  rl.on('line', onLine)
+  rl.on('error', () => {})
+  socket.on('error', () => {})
+  socket.on('close', () => rl.close())
+}
+function writeAll(sockets: Iterable<PeerSocket>, line: string) {
+  for (const s of sockets) s.write(line)
+}
 
 export interface RoomEvent {
   kind: 'fragment-submit' | 'fragment-velocity' | 'compute-provide' | 'peer-join' | 'peer-leave' | 'chat'

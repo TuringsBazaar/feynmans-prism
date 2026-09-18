@@ -2,9 +2,10 @@
 
 A distributed network of Feynmans churning on open research problems from
 [Emergent Mind](https://www.emergentmind.com). Each *pear* is a peer in a
-[Hyperswarm](https://github.com/holepunchto/hyperswarm) room that joins
-problems, chats, and (later) gets assigned fragments of the research tree.
-Looks like WebTorrent but instead of movies there are open problems.
+room that joins problems, chats, and (later) gets assigned fragments of the
+research tree. Pears find each other over loopback and over a
+[Tailscale](https://tailscale.com) tailnet (WireGuard). Looks like WebTorrent
+but instead of movies there are open problems.
 
 ![](docs/torrent-peers.png)
 
@@ -14,12 +15,19 @@ Needs Node.js ≥ 22.22, [pnpm](https://pnpm.io) and, for rooms of many pears, `
 
 ```bash
 pnpm -C torrent install
-pnpm -C torrent pear             # you are in room "pears". first pear in = coordinator = aman
+pnpm -C torrent pear             # you are in room "pears" as, say, Eridanus. first pear in = coordinator
 ```
 
-Open a second terminal and run the last line again: the header flips to
-`online · 1 peers` and the new pear is handed `guillefix`. Keys: `j`/`k` move ·
-`space` join/leave a problem · `enter` expand · `m` message · `q` quit.
+Open a second terminal and run the last line again with `--home <dir>`: the
+header flips to `online · 1 peers` and the new pear shows up under its own
+name. Keys: `j`/`k` move · `space` join/leave a problem · `enter` expand ·
+`m` message · `q` quit.
+
+The first run writes your identity to `~/.feynman/identity.json`: a keypair and
+a device name drawn at random from the DESIGN.md list (Nonacris, Eridanus,
+Corinth…). A second pear on the same machine needs its own with `--home <dir>`. If `tailscale` is
+running, pears on every online device of your tailnet see each other too;
+`--local` keeps a pear on loopback.
 
 ```bash
 pnpm -C torrent orchestrator -- 5        # a whole room at once, tiled in tmux
@@ -44,19 +52,19 @@ opencode login. `PEAR_MODEL` optionally selects another `deepseek/` model.
 
 ## all commands
 
-Run from the repo root. Hyperswarm commands take `--room <name>` to select a room.
+Run from the repo root. Room commands take `--room <name>` to select a room.
 
 | Command | What it does |
 | --- | --- |
-| `pnpm -C torrent pear -- [--room r] [--name n \| --index i] [--auto-join id] [--coordinator]` | one pear (Ink TUI; headless when stdin is not a TTY) |
-| `pnpm -C torrent orchestrator -- [N=5] [--room r] [--join] [--terminal]` | start N pears in a tmux session (`--terminal`: macOS Terminal windows) |
-| `pnpm -C torrent orchestrator -- stop [--room r]` | kill the tmux session; every pear un-announces |
+| `pnpm -C torrent pear -- [--room r] [--name n \| --index i] [--auto-join id] [--coordinator] [--local] [--home dir]` | one pear (Ink TUI; headless when stdin is not a TTY) |
+| `pnpm -C torrent orchestrator -- [N=5] [--room r] [--join] [--terminal]` | start N pears in a tmux session (`--terminal`: macOS Terminal windows); pear #i keeps its identity in `torrent/.pears/<room>/<i>` |
+| `pnpm -C torrent orchestrator -- stop [--room r]` | kill the tmux session; every pear closes its sockets |
 | `pnpm -C torrent message -- "hi" [--room r] [--as name] [--listen 12]` | one-shot message, listen for replies, exit |
 | `pnpm -C torrent transcript -- [--room r] [--every 30]` | record chat to `torrent/snapshots/<room>-<time>.md`; stdin lines are sent as `[scribe]` |
 | `pnpm -C torrent agent -- <persona> [--room r]` | LLM persona pear; persona ids are the keys of the JSON block in `PEARS.md`. Needs `OPENROUTER_API_KEY` (or an opencode login); `PEAR_MODEL` overrides the model |
-| `pnpm -C torrent discord` | Discord program chair with direct persona conversations and bounded delegation; setup below |
+| `pnpm -C torrent discord` | Discord program chair with direct persona conversations and bounded delegation; setup below. Still on Hyperswarm, so it does not see pear rooms until it is ported |
 | `pnpm -C torrent discord:costs [YYYY-MM-DD]` | reported OpenRouter usage and costs for a UTC day; defaults to today |
-| `pnpm -C torrent room` / `node torrent/scripts/guillefix.cjs <room>` | the original plain stdin chat client |
+| `pnpm -C torrent room` / `node torrent/scripts/guillefix.cjs <room>` | the original Hyperswarm stdin chat client (legacy; not in pear rooms any more) |
 | `pnpm -C torrent check` | `lint` (oxlint + prettier) · `typecheck` · `test` |
 | `uv sync` | Python deps for `graphs/` and `tools/` |
 | `uv run helm-mirror run` | evaluate feynman research runs, HELM-style ([design](tools/helm_mirror/design.md)) |
@@ -145,31 +153,47 @@ Verification: `pnpm -C torrent check`. Live smoke: start the bot, mention it wit
 
 ## how the torrent works
 
-There is no server. A room is a DHT topic (`sha256(room)`); every process that
-joins it finds the others.
+There is no server and no DHT. Every pear listens on the first free port of
+`7100–7109` and, on a backing-off schedule, dials every port of every host it
+can see: loopback always, plus every online device of the tailnet when
+`tailscale` is running (`tailscale status --json` is the tracker). The first
+line on a connection is an id handshake carrying the pear's public key, its
+room and its port; a pear in another room is dropped, and when two pears dial
+each other both keep the connection the lower key opened. Inbound connections
+are only accepted from loopback and Tailscale's own address ranges.
 
-**Naming.** One pear per room is the *coordinator* and owns the stack of free
-names (`aman guillefix alex yoyo lucy`, then `aayush … gwern`). A pear that
-starts into an empty room becomes coordinator immediately and takes `aman`.
-Every later pear starts as `waiting for name…`, asks the coordinator, and is
-handed the next name off the stack. If the coordinator quits, the remaining
-pear with the earliest name takes over; freed names go back on the stack. The
-header shows who is coordinating. `--name`/`--index` pin a name that is never
-yielded.
+**Identity.** `~/.feynman/identity.json` holds an ed25519 seed and the device
+name, both created on the first run (`--home` or `FEYNMAN_HOME` picks another
+directory). The public key is the pear's id on the wire and will sign
+contribution receipts. A corrupt file is refused rather than replaced.
+
+**Naming.** Every pear names itself: the device name in its identity file,
+drawn at random from DESIGN.md's list on the first run. When two pears meet
+wearing the same name, the one that joined the room later re-rolls and saves
+the new name; `--name`/`--index` pin a name that is never yielded. Names are
+for humans — the wire identifies pears by public key.
+
+**Coordinator.** One pear per room coordinates (it will own review routing and
+assignment). It is the pear that has been in the room longest, ties broken by
+key; every pear computes the same answer from the hellos it has seen, so there
+is no election traffic. A pear that starts into an empty room coordinates
+immediately; if the coordinator quits, the next most senior pear takes over.
+The header shows who is coordinating.
 
 **Messages.** Press `m`, type, `enter`. Messages go to every connected peer as a
 plain line `[name] text` — the same format the upstream
 [pear-to-pear](https://github.com/exanova-y/pear-to-pear) tools use, so a pear,
-`guillefix.cjs`, `message`, `transcript` and the LLM agents all share one room.
-The pear's own control protocol (hellos, joins, name requests) travels on the
+`message`, `transcript` and the LLM agents all share one room.
+The pear's own control protocol (hellos, joins, renames) travels on the
 same sockets as JSON lines prefixed with `U+001F`; every client skips those, so
 humans only see chat.
 
-**Orchestrator.** Pear #0 gets `--coordinator`; the others ask it for names, so
-everyone is named within a round-trip. `--join` gives each pear a different
-problem. `stop` kills the tmux session, which SIGHUPs every pear so it
-un-announces cleanly. Without tmux (or with `--terminal`) it opens one macOS
-Terminal window per pear instead; quit those with `q`.
+**Orchestrator.** Pear #0 gets `--coordinator` so the room has one from t=0;
+each pear keeps its own identity (and so its name) in `torrent/.pears/<room>/<i>`.
+`--join` gives each pear a different problem. `stop` kills the tmux session,
+which SIGHUPs every pear so it closes its sockets cleanly. Without tmux (or
+with `--terminal`) it opens one macOS Terminal window per pear instead; quit
+those with `q`.
 
 **Personas** are the JSON block in [PEARS.md](PEARS.md) (read at startup by the
 LLM agents). The `stirrer` walks the problem list in `torrent/src/data.ts`, the
@@ -177,13 +201,15 @@ single source of truth for names and problems.
 
 ### troubleshooting
 
-- **`connecting · 0 peers` for a long time.** A fresh room connects in 1–2 s.
-  The public `pears` topic can be slow (20–30 s) when it holds stale
-  announcements from pears that were killed hard; they expire on their own.
-  Any other `--room` is instant meanwhile.
-- **Phantom peers or wrong names.** Look for leftover processes:
-  `pgrep -fl pear.tsx`, then `pkill -f pear.tsx`. Pears un-announce on `q`,
-  Ctrl-C, SIGTERM and SIGHUP, so this should only happen after a hard kill.
+- **`connecting` for a long time.** Loopback pears connect within a second;
+  tailnet pears within one sweep (3 s, then backing off to 60 s). Check
+  `tailscale status` shows the other device online, and that both pears use
+  the same `--room`.
+- **Two pears on one machine share a name or fight.** They share
+  `~/.feynman/identity.json`; give the second one `--home <dir>`.
+- **`EADDRINUSE`.** All ten ports `7100–7109` are taken: `pgrep -fl pear.tsx`
+  finds leftover pears. Pears close their sockets on `q`, Ctrl-C, SIGTERM and
+  SIGHUP, so this should only happen after a hard kill.
 - **Two coordinators.** Two pears that both started into an apparently empty
   room self-elect; on meeting, the earlier start wins, the other gives up its
   name and asks the winner for one. Harmless.
@@ -192,8 +218,8 @@ single source of truth for names and problems.
 
 ```
 README.md  AGENT.md  DESIGN.md  CONTEXT.md  CHANGELOG.md  PEARS.md
-torrent/        the pear: p2p client over hyperswarm (TypeScript, Ink)
-  src/          wire · room · state · send · presence · naming · peer · lifecycle · ui/ · pear.tsx (entry) · discord/ (wip)
+torrent/        the pear: p2p client over loopback / tailscale (TypeScript, Ink)
+  src/          wire · identity · transport · room · state · send · presence · naming · peer · lifecycle · ui/ · pear.tsx (entry) · discord/ (wip, hyperswarm)
   scripts/      orchestrator · message · transcript · agent · guillefix.cjs
   tests/        node:test over the pure modules (wire, room, naming)
 autoresearch/   vendored feynman autoresearch

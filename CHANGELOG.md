@@ -3,6 +3,55 @@
 Newest first, start with yyyy-mm-dd in title
 
 
+## 2026-09-18 — Pears name themselves from the DESIGN.md device list
+
+- `data.ts`: `DEVICE_NAMES` (Nonacris … Tyrrhenian) replaces the
+  `aman…gwern` pools. `identity.json` gains `device`, picked at random on
+  first run (`pickDeviceName`, suffixed `-2, -3…` once all nineteen are
+  taken) and persisted; `--name`/`--index` still pin one.
+- Coordinator name stack retired: `request-name`/`assign` left the wire,
+  `naming.ts` shrank to election + collision. Election is now by room
+  seniority (`since`, ties by key) instead of name rank, so it no longer
+  depends on who wears which name. Two pears with the same name: the newer
+  one re-rolls and saves (`rename` broadcast, fixed names never yield).
+- `pendingAutoJoin` gone — a pear always has a name, so `--auto-join` fires
+  as soon as the room is ready. Header reads `device: Eridanus`.
+- Tests: `naming` (random pick, exhaustion suffix, seniority election),
+  `identity` (device persisted, re-roll saved).
+
+## 2026-09-18 — Hyperswarm → loopback / Tailscale transport, persistent identity
+
+Why: the DHT was the unreliable part (20–30 s connects on stale topics, phantom
+peers, no relay for symmetric NAT). Tailscale gives WireGuard-encrypted,
+DERP-relayed connectivity, and `tailscale status` is the tracker.
+
+- `src/transport.ts` (new): `local` (loopback) and `tailscale` transports;
+  pears listen on the first free port of `7100–7109` and dial every port of
+  every visible host. Inbound is gated to loopback + Tailscale ranges.
+- `src/room.ts` rewritten on `node:net`: id handshake as the first line
+  (`{t:'id', key, room, port}`), room filter, crossed-dial dedupe (lower key's
+  connection wins), `ready()` / `refresh()` / `close()`. The handshake reads the
+  first line by hand and `unshift`s the rest so a hello in the same chunk is
+  never lost. `readLines`/`writeAll`/`parseFlags` unchanged for scripts.
+- `src/identity.ts` (new): persistent ed25519 keypair in
+  `~/.feynman/identity.json` (`--home`, `FEYNMAN_HOME`), `sign`/`verify` via
+  `node:crypto`, no new dependency. This key will sign receipts.
+- `pear --local`, `pear --home`; orchestrator gives pear #i
+  `torrent/.pears/<room>/<i>` (gitignored). `lifecycle` polls `refresh()` on
+  the old backoff schedule.
+- Scripts `message transcript agent fragment-*` ported mechanically
+  (`room.on / ready / connections / close`).
+- Tests: `room` (loopback pair, dedupe, room isolation, trusted addresses),
+  `identity` (persistence, sign/verify, corrupt file refused). Smoke: two
+  headless pears + `message` probe: aman/guillefix naming, join propagation,
+  chat, clean exit, no ghosts.
+- Left as is: `src/discord/hyperswarm-client.ts` and `scripts/guillefix.cjs`
+  still use Hyperswarm (dependency kept for them); they no longer see pear
+  rooms. Discord tests currently fail on an unfinished persona entry in
+  `PEARS.md` (line 42, `"name":` without a value) — a user edit in progress.
+- Next: `--setup` onboarding + Headscale pre-auth keys as invite codes;
+  receipts and tiers on top of `identity.sign`.
+
 ## 2026-09-17 — One-command DeepSeek rooms
 
 - Added `just pears [count] [room]`, plus attach, restart, and stop recipes.

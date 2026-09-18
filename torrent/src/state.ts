@@ -26,14 +26,14 @@ export interface FeedEntry {
 // Identity and role of this process.
 export const self = {
   id: '', // public key hex, set by pear.tsx once the room is open
-  since: Date.now(), // for coordinator tiebreaks: earlier start wins
-  name: null as string | null,
+  home: '', // identity directory; the device name is persisted there
+  since: Date.now(), // coordinator election: earlier start wins
+  name: '', // device name from identity.json, or --name/--index
   fixedName: false, // --name/--index given; never yield it in a collision
   coordinator: false,
   coordinatorId: null as string | null, // peerId of the coordinator, if not us
   online: false,
   joined: new Set<string>(),
-  pendingAutoJoin: null as string | null, // deferred until we have a name to announce
 }
 
 export const remotes = new Map<string, Remote>()
@@ -78,7 +78,7 @@ export function peerCounts(): Record<string, number> {
 // ---- snapshot for the UI ---------------------------------------------------
 
 export interface Snapshot {
-  name: string | null
+  name: string
   coordinator: boolean
   coordinatorName: string | null
   online: boolean

@@ -5,22 +5,29 @@
 // problem verbatim. Subproblems come from the research tree run in
 // tools/outputs (credit-assignment only so far).
 
-export const INITIAL_PEARS = ['aman', 'guillefix', 'alex', 'yoyo', 'lucy']
-export const SUBSEQUENT_PEARS = [
-  'aayush',
-  'sudarsh',
-  'lev',
-  'celeste',
-  'ada',
-  'lydia',
-  'malaika',
-  'pavrati',
-  'yudhister',
-  'amir',
-  'ihar',
-  'gwern',
+// Device names from DESIGN.md. A pear picks one at random on first run and
+// keeps it in its identity file.
+export const DEVICE_NAMES = [
+  'Nonacris',
+  'Eridanus',
+  'Corinth',
+  'Mitylene',
+  'Pyrenees',
+  'Thrace',
+  'Inachos',
+  'Diana',
+  'Jupiter',
+  'Saturnia',
+  'Naiad',
+  'Nereid',
+  'Erymanthus',
+  'Coronis',
+  'Nyctimene',
+  'Thessaly',
+  'Vulcan',
+  'Lemnos',
+  'Tyrrhenian',
 ]
-export const PEAR_NAMES = [...INITIAL_PEARS, ...SUBSEQUENT_PEARS]
 
 export interface Subproblem {
   text: string

@@ -60,7 +60,7 @@ function stripTags(text: string) {
   return out.trim()
 }
 
-const { swarm, discovery } = openRoom(room)
+const pears = openRoom(room)
 const history: Message[] = []
 let lastReply = 0
 let lastActivity = 0
@@ -87,7 +87,7 @@ async function ask(messages: Message[]): Promise<string> {
 }
 
 function broadcast(text: string) {
-  writeAll(swarm.connections, text + '\n')
+  writeAll(pears.connections, text + '\n')
 }
 
 function shouldReply(fromTag: string | null): boolean {
@@ -126,9 +126,9 @@ async function handleLine(raw: string) {
   await reply()
 }
 
-swarm.on('connection', (socket) => {
+pears.on('connection', (socket) => {
   console.log(
-    `[${persona.name}] peer connected: ${peerId(socket).slice(0, 8)} (${swarm.connections.size} total)`,
+    `[${persona.name}] peer connected: ${peerId(socket).slice(0, 8)} (${pears.connections.size} total)`,
   )
   readLines(socket, (line) => {
     if (!manual) void handleLine(line)
@@ -149,7 +149,7 @@ if (manual) {
   console.log('[' + persona.name + '] awaiting assignment — type a problem and press Enter')
 }
 
-await discovery.flushed()
+await pears.ready()
 console.log(`[${persona.name}] joined room "${room}" as ${personaKey} (model ${MODEL})`)
 
 // ---- stirrer: walk the problem list when the room goes quiet ---------------
@@ -172,5 +172,5 @@ if (persona.stir && !manual) {
 }
 
 for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
-  process.once(sig, () => void swarm.destroy().then(() => process.exit(0)))
+  process.once(sig, () => void pears.close().then(() => process.exit(0)))
 }

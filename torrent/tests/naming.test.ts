@@ -1,33 +1,36 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { PEAR_NAMES } from '../src/data.ts'
-import { freeNameStack, nameRank, pickCoordinator, popFreeName } from '../src/naming.ts'
+import { DEVICE_NAMES } from '../src/data.ts'
+import { pickDeviceName } from '../src/identity.ts'
+import { pickCoordinator } from '../src/naming.ts'
 
-describe('naming', () => {
-  it('ranks canonical names by position, unknown after, unnamed last', () => {
-    assert.equal(nameRank('aman'), 0)
-    assert.equal(nameRank('gwern'), PEAR_NAMES.length - 1)
-    assert.equal(nameRank('zed'), PEAR_NAMES.length)
-    assert.equal(nameRank(null), Number.POSITIVE_INFINITY)
+const first = () => 0
+const last = () => 0.999
+
+describe('device names', () => {
+  it('picks a random free name from the DESIGN.md list', () => {
+    assert.equal(pickDeviceName([], first), 'Nonacris')
+    assert.equal(pickDeviceName(['Nonacris'], first), 'Eridanus')
+    assert.equal(pickDeviceName([], last), 'Tyrrhenian')
+    for (let i = 0; i < 50; i++) {
+      const n = pickDeviceName(['Diana'])
+      assert.ok(DEVICE_NAMES.includes(n) && n !== 'Diana', n)
+    }
   })
 
-  it('pops the first free name in canonical order', () => {
-    assert.equal(popFreeName([]), 'aman')
-    assert.equal(popFreeName(['aman', 'guillefix']), 'alex')
-    assert.deepEqual(freeNameStack(['aman']).slice(0, 2), ['guillefix', 'alex'])
+  it('suffixes a name once all nineteen are in use', () => {
+    assert.equal(pickDeviceName(DEVICE_NAMES, first), 'Nonacris-2')
+    assert.equal(pickDeviceName([...DEVICE_NAMES, 'Nonacris-2'], first), 'Nonacris-3')
   })
+})
 
-  it('suffixes the last name once the pool is exhausted', () => {
-    assert.equal(popFreeName(PEAR_NAMES), 'gwern-1')
-    assert.equal(popFreeName([...PEAR_NAMES, 'gwern-1']), 'gwern-2')
-  })
-
-  it('elects the lowest-ranked name, ties broken by id, identically on every pear', () => {
-    const a = { id: 'aaaa', name: 'lucy' }
-    const b = { id: 'bbbb', name: 'aman' }
-    const c = { id: 'cccc', name: null }
+describe('election', () => {
+  it('elects the earliest start, ties broken by id, identically on every pear', () => {
+    const a = { id: 'aaaa', since: 30 }
+    const b = { id: 'bbbb', since: 10 }
+    const c = { id: 'cccc', since: 20 }
     assert.equal(pickCoordinator(a, [b, c]), 'bbbb')
     assert.equal(pickCoordinator(b, [a, c]), null) // b sees itself win
-    assert.equal(pickCoordinator({ id: 'zzzz', name: null }, [{ id: 'yyyy', name: null }]), 'yyyy')
+    assert.equal(pickCoordinator({ id: 'zzzz', since: 5 }, [{ id: 'yyyy', since: 5 }]), 'yyyy')
   })
 })

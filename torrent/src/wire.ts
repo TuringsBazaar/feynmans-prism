@@ -2,7 +2,7 @@
 // transcript, agent). Newline-framed, one message per line:
 //
 //   chat     "[name] text"           plain text, human readable
-//   control  "\u001f" + JSON         hello/join/leave/name protocol (pear only)
+//   control  "\u001f" + JSON         hello/join/leave/rename protocol (pear only)
 //
 // Anything that is neither is untagged chat from that peer. Pure functions
 // only — no I/O — so this module is safe to import from tests and scripts.
@@ -18,8 +18,6 @@ export type Control =
   | { t: 'rename'; name: string }
   | { t: 'join'; name: string; problemId: string }
   | { t: 'leave'; name: string; problemId: string }
-  | { t: 'request-name' } // member → coordinator
-  | { t: 'assign'; name: string } // coordinator → member
   | { t: 'compute-provide'; computeUnits: number; role: 'provider' | 'researcher' | 'hybrid' } // peer announces compute
   | { t: 'submit-fragment'; problemId: string; subproblemId: string; content: string } // peer submits solution
   | { t: 'report-velocity'; fragmentId: string; amplificationFactor: number } // peer reports downstream speedup

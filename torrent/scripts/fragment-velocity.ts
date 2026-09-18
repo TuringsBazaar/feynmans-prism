@@ -18,15 +18,15 @@ if (!fragmentId || !factorStr || isNaN(Number(factorStr))) {
 
 const amplificationFactor = Number(factorStr)
 const room = flagString(flags, 'room', DEFAULT_ROOM)
-const { swarm, discovery } = openRoom(room)
+const pears = openRoom(room)
 
-swarm.on('connection', (socket) => {
+pears.on('connection', (socket) => {
   readLines(socket, (line) => {
     if (!isControl(line)) console.log(line)
   })
 })
 
-await discovery.flushed()
+await pears.ready()
 await sleep(1000)
 
 const msg = encodeControl({
@@ -35,16 +35,16 @@ const msg = encodeControl({
   amplificationFactor,
 })
 
-const n = swarm.connections.size
+const n = pears.connections.size
 if (n === 0) {
   console.log(`no coordinator in room "${room}" yet`)
 } else {
-  writeAll(swarm.connections, msg)
+  writeAll(pears.connections, msg)
   console.log(
     `>> reported velocity ${amplificationFactor}x on fragment ${fragmentId.slice(0, 8)} to ${n} node${n === 1 ? '' : 's'}`,
   )
 }
 
 await sleep(2000)
-await swarm.destroy()
+await pears.close()
 process.exit(0)

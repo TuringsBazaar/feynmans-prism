@@ -23,7 +23,7 @@ export function Header({ data }: { data: Snapshot }) {
       <Text>
         {data.online ? 'online' : 'connecting'} · {total} peers{role}
       </Text>
-      <Text>node: {data.name ?? 'waiting for name…'}</Text>
+      <Text>device: {data.name}</Text>
     </Box>
   )
 }

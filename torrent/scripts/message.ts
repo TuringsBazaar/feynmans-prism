@@ -21,24 +21,24 @@ const as = flagString(flags, 'as', 'probe')
 const listenSec = Number(flagString(flags, 'listen', '12'))
 const text = flags.positional.join(' ') || 'Hello pears, who is here?'
 
-const { swarm, discovery } = openRoom(room)
-swarm.on('connection', (socket) => {
+const pears = openRoom(room)
+pears.on('connection', (socket) => {
   const id = peerId(socket).slice(0, 8)
   readLines(socket, (line) => {
     if (!isControl(line)) console.log(`[${id}] ${line}`)
   })
 })
 
-await discovery.flushed()
-await sleep(4000) // give the DHT lookup a moment to hand us the room's current peers
+await pears.ready()
+await sleep(4000) // let the first sweep of dials and handshakes settle
 
-const n = swarm.connections.size
+const n = pears.connections.size
 if (n === 0) console.log(`no peers in room "${room}" yet; message not sent`)
 else {
-  writeAll(swarm.connections, encodeChat(as, text))
+  writeAll(pears.connections, encodeChat(as, text))
   console.log(`>> sent to ${n} peer${n === 1 ? '' : 's'}: [${as}] ${text}`)
 }
 
 await sleep(listenSec * 1000)
-await swarm.destroy()
+await pears.close()
 process.exit(0)

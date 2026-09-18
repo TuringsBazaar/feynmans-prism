@@ -4,3 +4,4 @@ snapshots
 .DS_Store
 .env
 .env.local
+.pears/
