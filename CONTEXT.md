@@ -89,3 +89,10 @@ Suppose Feynman agent is set off to research "Scaling laws for Neural Language M
 - try a sql database for a particular problem and representing it in a tree
 - Next: try PyTorch geometric and Mikhail Galkin's work. to build new roads between ideas explored. Give autoresearch another literature database given 100 - 200 papers in. Check to see system could generate new hypotheses compared to unimproved Feynman
 - rwx research policy like from @rwx.md
+
+sept 18 — problem graph notes:
+- the graph restructures itself from two signals only: a fragment (solves a node, spawns children) and an amplification report (reinforces or drops the roads into a node). a road whose weight decays to the floor is deleted: the claimed dependency never sped anything up, so it was not a dependency. this is the Roman-roads demotion (viae publicae → viae vicinales → sewer) applied to edges, and it can also *unblock* nodes, since a dropped requirement stops gating its source.
+- humans do not restructure directly. proposals queue and are settled in batches, the same rhythm as fragments waiting for peer review. open question: should batch approval itself be an assignable review job (silver tier), and should a rejected proposal still leave a low-weight trace so the same dead end is not proposed twice?
+- readiness = open node whose every requires-edge points at a solved (or retired) node. this is the frontier the assigner should draw from; assignment.ts does not read it yet.
+- edges are within a problem for now. cross-problem "unlocks" (the review form's "Unlocks: #190, #191") need a global node id; `problemId/qN` would do.
+- pheromone bounds are copied from tools/research `trails` (0.05–10) so the two graphs can be merged later.

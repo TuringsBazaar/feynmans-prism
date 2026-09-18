@@ -8,21 +8,25 @@
     "node": ">=22.22"
   },
   "scripts": {
-    "pear": "tsx src/pear.tsx",
+    "pear": "tsx --no-warnings=ExperimentalWarning src/pear.tsx",
     "room": "node scripts/guillefix.cjs pears",
     "orchestrator": "tsx scripts/orchestrator.ts",
     "message": "tsx scripts/message.ts",
     "transcript": "tsx scripts/transcript.ts",
     "agent": "tsx scripts/agent.ts",
+    "join": "node --env-file-if-exists=.env.local --import tsx scripts/join.ts",
+    "invite": "node --env-file-if-exists=.env.local --import tsx scripts/invite.ts",
     "discord": "node --env-file-if-exists=.env.local --import tsx scripts/discord.ts",
     "discord:costs": "node --import tsx scripts/discord-costs.ts",
     "fragment-submit": "tsx scripts/fragment-submit.ts",
     "fragment-velocity": "tsx scripts/fragment-velocity.ts",
     "fragment-compute": "tsx scripts/fragment-compute.ts",
+    "propose": "tsx scripts/propose.ts",
+    "review": "tsx scripts/review.ts",
     "lint": "oxlint && prettier --check .",
     "fmt": "prettier --write . && oxlint --fix",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test tests/*.test.ts",
+    "test": "node --no-warnings=ExperimentalWarning --import tsx --test tests/*.test.ts",
     "check": "pnpm lint && pnpm typecheck && pnpm test"
   },
   "dependencies": {

@@ -3,6 +3,67 @@
 Newest first, start with yyyy-mm-dd in title
 
 
+## 2026-09-18 — feynman.network/join: Headscale, invites, usernames
+
+- `infra/headscale/`: `compose.yaml` (headscale 0.29.3 + caddy), `config.yaml`
+  (server_url feynman.network, Tailscale's public DERP map, sqlite, MagicDNS
+  under `pears.feynman.network`), `Caddyfile` (TLS, `/join` → `site/join.sh`,
+  rest proxied to headscale). Not deployed yet — needs a VPS and DNS.
+- `site/join.sh`: the curl target. Installs tailscale (only with an invite),
+  checks node ≥ 22 / pnpm, clones into `~/.feynman/prism`, runs `pnpm join`.
+- `scripts/join.ts` (`pnpm join`): `tailscale up --login-server … --authkey`
+  from the invite when not already on a tailnet (sudo on Linux), asks for a
+  username (default: tailnet login, else OS user), saves `username` and
+  `invitedBy` into identity.json, launches the pear. `--no-launch` for scripts.
+- `scripts/invite.ts` (`pnpm invite`): find-or-create the Headscale user
+  (`GET/POST /api/v1/user`), mint a single-use pre-auth key
+  (`POST /api/v1/preauthkey`, user id as string per v0.29 swagger), print the
+  code and the one-liner. `src/headscale.ts` is the client (errors carry
+  status only, never bodies); `src/invite.ts` is the code format
+  `feynman:<host>:<inviter pubkey>:<key>`.
+- Identity file gains `username` / `invitedBy`; `saveIdentity(home, patch)`
+  replaces `saveDevice`. `hello` carries `user` and `invitedBy`; the feed says
+  `… connected as yoyo` and `… joined on your invite`; header shows `you:`.
+- Tests: `invite` (code round-trip, malformed codes, headscale client against
+  a fake fetch: call order, bearer header, single-use key, expiry, error
+  hygiene). Dry-run: `pnpm join --no-launch` headless writes the username.
+- Open: the invite receipt itself (inviter credit) waits for the receipts
+  stage; `pnpm invite` is admin-only until tiers gate it.
+
+## 2026-09-18 — Problem graph in SQLite, restructured by fragments
+
+Why: DESIGN.md asked for hierarchical decomposition plus a dependency graph
+that changes as peers contribute. The tree was a flat hardcoded list.
+
+- `src/tree.ts` (new, pure): `GraphNode`/`GraphEdge`/`Proposal`/`GraphSnapshot`
+  types, `readySet` (open nodes whose requires-edges are all solved),
+  `buildTree`/`flatten` for the TUI, `nextId`. An edge src → dst means "src
+  requires dst"; weight is a pheromone with the same 0.05–10 bounds as
+  `tools/research`.
+- `src/graph.ts` (new): `Graph` over `node:sqlite` — nodes, edges, proposals;
+  `seed` (idempotent from data.ts, `q1…qN`), `addNode`, `link`, `reinforce`
+  (scales roads into a node, drops those at the floor), `propose`/`pending`/
+  `review` (batch), `snapshot`/`absorb`.
+- `src/restructure.ts` (new, coordinator only): `onFragmentSolved` (solve,
+  create if unlisted, add spawns as children, report unlocks),
+  `onAmplification` (reinforce/drop), `onProposal`, `onReview`; every change
+  broadcasts a `graph` snapshot; `absorbBroadcasts` on election. Graph file is
+  `<home>/graph.sqlite`.
+- Wire: `submit-fragment.spawns?`, `propose-subproblem`, `review-proposals`,
+  `graph`. Coordinator sends the graph on every new connection (scripts do not
+  hello). `handleSubmitFragment` now records the sending peer as contributor.
+- TUI: expanded problems render the tree (`✓ ○ ·`), `p` proposes for the
+  problem under the cursor, `r` approves the whole queue (coordinator).
+- Scripts: `propose`, `review`; `fragment-submit --spawns "a || b"`.
+  `pear`/`test` pass `--no-warnings=ExperimentalWarning` for node:sqlite.
+- Tests: `graph` (seed, ids, readiness, reinforce, batch review, absorb),
+  `restructure` (spawn/unlock, unlisted node, demotion, queue, takeover).
+  Smoke: two local pears + submit/propose/review scripts; sqlite inspected.
+- Known: `tests/discord.test.ts` "failed worker is disclosed" fails before and
+  after this change (synthesis wording), untouched here.
+- Not done: tier gating of who may propose or link; cross-problem edges;
+  `assignment.ts` still takes a caller-supplied list rather than `readySet`.
+
 ## 2026-09-18 — Pears name themselves from the DESIGN.md device list
 
 - `data.ts`: `DEVICE_NAMES` (Nonacris … Tyrrhenian) replaces the

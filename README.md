@@ -25,7 +25,28 @@ name. Keys: `j`/`k` move · `space` join/leave a problem · `enter` expand ·
 
 The first run writes your identity to `~/.feynman/identity.json`: a keypair and
 a device name drawn at random from the DESIGN.md list (Nonacris, Eridanus,
-Corinth…). A second pear on the same machine needs its own with `--home <dir>`. If `tailscale` is
+Corinth…). A second pear on the same machine needs its own with `--home <dir>`.
+
+## joining from a link
+
+Someone on the network sends you an invite code; on any laptop:
+
+```bash
+curl -fsSL https://adiabatic.garden/join | sh -s -- feynman:adiabatic.garden:<inviter>:<key>
+```
+
+That installs Tailscale if needed, clones this repo into `~/.feynman/prism`,
+logs the machine into the feynman tailnet with the invite's single-use key,
+asks for a username, records who invited you, and starts the pear. On a
+checkout you already have, `pnpm -C torrent join -- --invite <code>` does the
+same from step two. Without an invite, `pnpm -C torrent join` just sets the
+username and launches; pears then only meet over loopback or a tailnet you are
+already on.
+
+To invite someone, put `HEADSCALE_URL` and `HEADSCALE_API_KEY` in
+`torrent/.env.local` (see hosting below) and run
+`pnpm -C torrent invite -- --user <their name>`; without `--user` the key is
+for another device of your own. If `tailscale` is
 running, pears on every online device of your tailnet see each other too;
 `--local` keeps a pear on loopback.
 
@@ -59,12 +80,18 @@ Run from the repo root. Room commands take `--room <name>` to select a room.
 | `pnpm -C torrent pear -- [--room r] [--name n \| --index i] [--auto-join id] [--coordinator] [--local] [--home dir]` | one pear (Ink TUI; headless when stdin is not a TTY) |
 | `pnpm -C torrent orchestrator -- [N=5] [--room r] [--join] [--terminal]` | start N pears in a tmux session (`--terminal`: macOS Terminal windows); pear #i keeps its identity in `torrent/.pears/<room>/<i>` |
 | `pnpm -C torrent orchestrator -- stop [--room r]` | kill the tmux session; every pear closes its sockets |
+| `pnpm -C torrent join -- [--invite code] [--home dir] [--room r] [--no-launch]` | one-time setup: tailnet login with the invite, username, then the pear |
+| `pnpm -C torrent invite -- [--user name] [--hours 24]` | mint an invite code (single-use Headscale pre-auth key); needs `HEADSCALE_URL`/`HEADSCALE_API_KEY` |
 | `pnpm -C torrent message -- "hi" [--room r] [--as name] [--listen 12]` | one-shot message, listen for replies, exit |
 | `pnpm -C torrent transcript -- [--room r] [--every 30]` | record chat to `torrent/snapshots/<room>-<time>.md`; stdin lines are sent as `[scribe]` |
 | `pnpm -C torrent agent -- <persona> [--room r]` | LLM persona pear; persona ids are the keys of the JSON block in `PEARS.md`. Needs `OPENROUTER_API_KEY` (or an opencode login); `PEAR_MODEL` overrides the model |
 | `pnpm -C torrent discord` | Discord program chair with direct persona conversations and bounded delegation; setup below. Still on Hyperswarm, so it does not see pear rooms until it is ported |
 | `pnpm -C torrent discord:costs [YYYY-MM-DD]` | reported OpenRouter usage and costs for a UTC day; defaults to today |
 | `pnpm -C torrent room` / `node torrent/scripts/guillefix.cjs <room>` | the original Hyperswarm stdin chat client (legacy; not in pear rooms any more) |
+| `pnpm -C torrent fragment-submit -- <problemId> <subproblemId> "<content>" [--spawns "q \|\| q"] [--room r]` | solve a subproblem; `--spawns` lists the subproblems it uncovered, which the coordinator adds under the solved node |
+| `pnpm -C torrent fragment-velocity -- <fragmentId> <factor> [--room r]` | report downstream speedup; the roads into that node are reinforced (or dropped when the factor stays below 1) |
+| `pnpm -C torrent propose -- <problemId> "<text>" [--parent q3] [--room r]` | propose a subproblem; it waits in the coordinator's review queue |
+| `pnpm -C torrent review -- [--approve all\|1,2] [--reject 3] [--room r]` | list the queue, or settle a batch of it |
 | `pnpm -C torrent check` | `lint` (oxlint + prettier) · `typecheck` · `test` |
 | `uv sync` | Python deps for `graphs/` and `tools/` |
 | `uv run helm-mirror run` | evaluate feynman research runs, HELM-style ([design](tools/helm_mirror/design.md)) |
@@ -195,9 +222,46 @@ which SIGHUPs every pear so it closes its sockets cleanly. Without tmux (or
 with `--terminal`) it opens one macOS Terminal window per pear instead; quit
 those with `q`.
 
+**Problem graph.** The coordinator keeps every problem's subproblems, the
+dependencies between them and the proposal queue in `<home>/graph.sqlite`
+(`node:sqlite`, no native module) and broadcasts a snapshot of the problem
+after each change; other pears render that snapshot, and a pear that takes
+over as coordinator absorbs the last snapshot it saw before writing. The graph
+is seeded once from `torrent/src/data.ts` (`q1…qN` per problem) and then grows
+on its own. A submitted fragment marks its node solved, adds each `--spawns`
+subproblem as a child that required it, and logs which open nodes it
+unlocked. A velocity report multiplies the weight of every road into that
+node by the factor; a road that decays below 0.05 is dropped, since a
+dependency that never sped anything up was not one. Those two changes need no
+one's approval. Human proposals (`p` in the TUI, `pnpm propose`) queue up
+instead and are settled in batches (`r` as coordinator, `pnpm review`).
+Expanding a problem shows the tree: `✓` solved, `○` ready, `·` blocked on an
+open requirement.
+
 **Personas** are the JSON block in [PEARS.md](PEARS.md) (read at startup by the
 LLM agents). The `stirrer` walks the problem list in `torrent/src/data.ts`, the
 single source of truth for names and problems.
+
+### hosting adiabatic.garden
+
+The tailnet's control plane is [Headscale](https://github.com/juanfont/headscale)
+behind Caddy, defined in `infra/headscale/` (Caddy also serves `/join`).
+On a small VPS with ports 80 and 443 open and DNS for `adiabatic.garden`
+pointing at it:
+
+```bash
+scp -r infra/headscale you@vps:feynman && ssh you@vps
+cd feynman && docker compose up -d
+docker compose exec headscale headscale users create <you>
+docker compose exec headscale headscale apikeys create --expiration 90d   # → HEADSCALE_API_KEY
+```
+
+Back on your machine, set `HEADSCALE_URL=https://adiabatic.garden` and the API
+key in `torrent/.env.local`, then `pnpm -C torrent invite -- --user <you>` and
+run the printed `curl … | sh -s -- <code>` line on each of your devices. Every
+device on the tailnet is visible to every pear; there is no other server. To
+use another domain, change it in `Caddyfile`, `config.yaml` (`server_url`,
+`dns.base_domain`) and `site/join.sh`.
 
 ### troubleshooting
 
@@ -219,8 +283,9 @@ single source of truth for names and problems.
 ```
 README.md  AGENT.md  DESIGN.md  CONTEXT.md  CHANGELOG.md  PEARS.md
 torrent/        the pear: p2p client over loopback / tailscale (TypeScript, Ink)
-  src/          wire · identity · transport · room · state · send · presence · naming · peer · lifecycle · ui/ · pear.tsx (entry) · discord/ (wip, hyperswarm)
-  scripts/      orchestrator · message · transcript · agent · guillefix.cjs
+  src/          wire · identity · invite · headscale · transport · room · state · send · presence · naming · peer · lifecycle · ui/ · pear.tsx (entry) · discord/ (wip, hyperswarm)
+  scripts/      join · invite · orchestrator · message · transcript · agent · guillefix.cjs
+infra/headscale/  adiabatic.garden: Headscale + Caddy compose, config, and the /join script
   tests/        node:test over the pure modules (wire, room, naming)
 autoresearch/   vendored feynman autoresearch
 tools/          helm_mirror (evaluator) · research (SQLite research tree) · instructions · outputs/ (untracked)

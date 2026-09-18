@@ -9,20 +9,33 @@
 
 // Control lines start with the ASCII "unit separator" so plain-text clients
 // can skip them with one check.
+import type { GraphSnapshot } from './tree.ts'
+
 export const CONTROL_PREFIX = '\u001f'
 
 export const CHAT_TAG = /^\[([^\]]+)\]\s?(.*)$/s
 
 export type Control =
-  | { t: 'hello'; name: string | null; joined: string[]; coordinator: boolean; since: number }
+  | {
+      t: 'hello'
+      name: string | null
+      joined: string[]
+      coordinator: boolean
+      since: number
+      user?: string | null
+      invitedBy?: string | null
+    }
   | { t: 'rename'; name: string }
   | { t: 'join'; name: string; problemId: string }
   | { t: 'leave'; name: string; problemId: string }
   | { t: 'compute-provide'; computeUnits: number; role: 'provider' | 'researcher' | 'hybrid' } // peer announces compute
-  | { t: 'submit-fragment'; problemId: string; subproblemId: string; content: string } // peer submits solution
+  | { t: 'submit-fragment'; problemId: string; subproblemId: string; content: string; spawns?: string[] } // peer submits solution; spawns = subproblems it uncovered
   | { t: 'report-velocity'; fragmentId: string; amplificationFactor: number } // peer reports downstream speedup
   | { t: 'assign-fragment'; problemId: string; subproblemId: string } // peer announces assignment pickup
   | { t: 'chat'; from: string; text: string } // broadcasted message (for Discord stirring)
+  | { t: 'propose-subproblem'; problemId: string; parentId: string | null; text: string } // human proposal → coordinator's review queue
+  | { t: 'review-proposals'; approve: number[]; reject: number[] } // settle a batch of the queue
+  | ({ t: 'graph' } & GraphSnapshot) // coordinator → everyone, after each change
 
 export type ControlOf<T extends Control['t']> = Extract<Control, { t: T }>
 

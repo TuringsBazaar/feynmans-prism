@@ -1,7 +1,10 @@
 // Submit a fragment (solution to a subproblem) into the room.
 // The coordinator receives it and updates metrics.
 //
-//   pnpm fragment-submit -- <problemId> <subproblemId> <content> [--room pears] [--as solver]
+//   pnpm fragment-submit -- <problemId> <subproblemId> <content> [--room pears] [--spawns "q || q"]
+//
+// --spawns lists subproblems uncovered while solving, separated by "||"; the
+// coordinator adds them to the graph as children of the solved node.
 
 import { DEFAULT_ROOM, flagString, openRoom, parseFlags, readLines, sleep, writeAll } from '../src/room.ts'
 import { encodeControl, isControl } from '../src/wire.ts'
@@ -17,6 +20,10 @@ if (!problemId || !subproblemId || !content) {
 }
 
 const room = flagString(flags, 'room', DEFAULT_ROOM)
+const spawns = flagString(flags, 'spawns', '')
+  .split('||')
+  .map((s) => s.trim())
+  .filter(Boolean)
 const pears = openRoom(room)
 
 pears.on('connection', (socket) => {
@@ -33,6 +40,7 @@ const msg = encodeControl({
   problemId,
   subproblemId,
   content,
+  spawns,
 })
 
 const n = pears.connections.size

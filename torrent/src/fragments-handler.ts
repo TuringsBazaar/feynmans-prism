@@ -1,8 +1,12 @@
 // Coordinator-side handlers for fragment submission and velocity reporting.
+// Each one updates the ledger (metrics) and then the problem graph
+// (restructure.ts): a submission solves its node, a velocity report
+// reinforces the roads into it.
 
 import { self, coordinatorLedger, initCoordinatorLedger, notify, logEvent } from './state.ts'
 import type { Fragment } from './fragments.ts'
 import { updateAmplificationFactor, computeAvgAmplification } from './fragments.ts'
+import { onAmplification, onFragmentSolved } from './restructure.ts'
 import crypto from 'crypto'
 
 function initContributorMetrics(peerId: string, name: string | null) {
@@ -23,24 +27,30 @@ function updateSolveVelocity(peerId: string) {
   metrics.solveVelocity = metrics.fragmentsSubmitted / Math.max(elapsed, 0.1)
 }
 
-function recordFragmentSubmission(fragmentId: string, subproblemId: string) {
+function recordFragmentSubmission(fragmentId: string, subproblemId: string, contributorId: string) {
   if (!coordinatorLedger) return
-  let metrics = coordinatorLedger.peerMetrics.get(self.id)
+  let metrics = coordinatorLedger.peerMetrics.get(contributorId)
   if (!metrics) {
-    metrics = initContributorMetrics(self.id, self.name)
-    coordinatorLedger.peerMetrics.set(self.id, metrics)
+    metrics = initContributorMetrics(contributorId, contributorId === self.id ? self.name : null)
+    coordinatorLedger.peerMetrics.set(contributorId, metrics)
   }
   metrics.fragmentsSubmitted += 1
-  updateSolveVelocity(self.id)
+  updateSolveVelocity(contributorId)
   logEvent(`Fragment ${fragmentId.slice(0, 8)} submitted to ${subproblemId}`)
 }
 
+// `contributorId` is the sending peer (defaults to self for local submits).
+// The graph is updated even when the ledger is bound to another problem: the
+// ledger is per problem for now, the graph is not.
 export function handleSubmitFragment(
   problemId: string,
   subproblemId: string,
   content: string,
+  contributorId = self.id,
+  spawns: string[] = [],
 ): string | null {
   if (!self.coordinator) return null
+  onFragmentSolved(problemId, subproblemId, spawns)
   if (!coordinatorLedger) initCoordinatorLedger(problemId)
   if (!coordinatorLedger || coordinatorLedger.problemId !== problemId) {
     return null
@@ -51,14 +61,14 @@ export function handleSubmitFragment(
     id: fragmentId,
     problemId,
     subproblemId,
-    contributorId: self.id,
+    contributorId,
     submittedAt: Date.now(),
     content,
     amplificationFactors: [],
   }
 
   coordinatorLedger.fragments.set(fragmentId, fragment)
-  recordFragmentSubmission(fragmentId, subproblemId)
+  recordFragmentSubmission(fragmentId, subproblemId, contributorId)
   notify()
   return fragmentId
 }
@@ -82,6 +92,7 @@ export function handleReportVelocity(fragmentId: string, amplificationFactor: nu
   logEvent(
     `Fragment ${fragmentId.slice(0, 8)} velocity: ${amplificationFactor.toFixed(2)}x (avg: ${avgAmpl.toFixed(2)}x)`,
   )
+  onAmplification(fragment.problemId, fragment.subproblemId, amplificationFactor)
   notify()
 }
 

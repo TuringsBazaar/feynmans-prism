@@ -1,0 +1,36 @@
+# adiabatic.garden: Headscale (the tailnet control plane) behind Caddy (TLS,
+# and the /join script). Run on any small VPS with ports 80/443 open:
+#
+#   docker compose up -d
+#   docker compose exec headscale headscale users create <you>
+#   docker compose exec headscale headscale apikeys create --expiration 90d
+#
+# Clients connect with `tailscale up --login-server https://adiabatic.garden
+# --authkey <pre-auth key>`; `pnpm invite` mints those keys over the API.
+
+services:
+  headscale:
+    image: docker.io/headscale/headscale:0.29.3
+    command: serve
+    restart: unless-stopped
+    volumes:
+      - ./config.yaml:/etc/headscale/config.yaml:ro
+      - headscale-data:/var/lib/headscale
+      - headscale-run:/var/run/headscale
+
+  caddy:
+    image: docker.io/library/caddy:2
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./site:/srv:ro
+      - caddy-data:/data
+
+volumes:
+  headscale-data: {}
+  headscale-run: {}
+  caddy-data: {}

@@ -4,7 +4,8 @@
 import { clearHelloGrace, demoteCoordinator, elect, maybeElect, resolveNameCollision } from './naming.ts'
 import { peerId, readLines, type PeerSocket } from './room.ts'
 import { hello, sendControl } from './send.ts'
-import { logChat, logEvent, notify, remoteLabel, remotes, self, type Remote } from './state.ts'
+import { graphs, logChat, logEvent, notify, remoteLabel, remotes, self, type Remote } from './state.ts'
+import { onProposal, onReview, publishTo } from './restructure.ts'
 import { parseChat, parseControl, type Control, type ControlOf } from './wire.ts'
 import {
   handleAssignmentPickup,
@@ -20,6 +21,7 @@ export function onConnection(socket: PeerSocket) {
   const prev = remotes.get(rid)
   remotes.set(rid, {
     name: prev?.name ?? null,
+    user: prev?.user ?? null,
     joined: prev?.joined ?? new Set(),
     socket,
     coordinator: prev?.coordinator ?? false,
@@ -27,6 +29,8 @@ export function onConnection(socket: PeerSocket) {
     since: prev?.since ?? 0,
   })
   sendControl(socket, hello())
+  // Scripts never say hello, so the graph goes out with ours, not after theirs.
+  if (self.coordinator) publishTo(socket)
   notify()
 
   readLines(socket, (raw) => {
@@ -44,7 +48,7 @@ function handleFragmentControl(msg: Partial<Control> & { t: string }, fromId: st
     }
     case 'submit-fragment': {
       const m = msg as ControlOf<'submit-fragment'>
-      return handleSubmitFragment(m.problemId, m.subproblemId, m.content)
+      return handleSubmitFragment(m.problemId, m.subproblemId, m.content, fromId, m.spawns ?? [])
     }
     case 'report-velocity': {
       const m = msg as ControlOf<'report-velocity'>
@@ -53,6 +57,31 @@ function handleFragmentControl(msg: Partial<Control> & { t: string }, fromId: st
     case 'assign-fragment': {
       const m = msg as ControlOf<'assign-fragment'>
       return handleAssignmentPickup(m.problemId, m.subproblemId, fromId)
+    }
+    default:
+      return handleGraphControl(msg, fromId)
+  }
+}
+
+// Proposals and reviews are the coordinator's to apply; graph snapshots are
+// everyone else's to display.
+function handleGraphControl(msg: Partial<Control> & { t: string }, fromId: string) {
+  switch (msg.t) {
+    case 'propose-subproblem': {
+      const m = msg as ControlOf<'propose-subproblem'>
+      if (self.coordinator) onProposal(m.problemId, m.parentId ?? null, m.text, remoteLabel(fromId))
+      return
+    }
+    case 'review-proposals': {
+      const m = msg as ControlOf<'review-proposals'>
+      if (self.coordinator) onReview(m.approve ?? [], m.reject ?? [])
+      return
+    }
+    case 'graph': {
+      const m = msg as ControlOf<'graph'>
+      if (self.coordinator || fromId !== self.coordinatorId) return
+      graphs.set(m.problemId, { problemId: m.problemId, nodes: m.nodes, edges: m.edges, pending: m.pending })
+      return notify()
     }
   }
 }
@@ -81,12 +110,14 @@ function onHello(rid: string, r: Remote, m: ControlOf<'hello'>) {
   const firstHello = !r.hello
   r.hello = true
   r.name = m.name ?? null
+  r.user = m.user ?? null
   r.joined = new Set(m.joined ?? [])
   r.coordinator = Boolean(m.coordinator)
   r.since = m.since ?? Date.now()
 
   if (firstHello) {
-    logEvent(`${remoteLabel(rid)} connected`)
+    logEvent(`${remoteLabel(rid)} connected${r.user ? ` as ${r.user}` : ''}`)
+    if (m.invitedBy === self.id) logEvent(`${remoteLabel(rid)} joined on your invite`)
     for (const p of r.joined) logEvent(`${remoteLabel(rid)} joined ${p}`)
   }
   resolveCoordination(rid, r)

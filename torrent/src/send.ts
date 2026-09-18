@@ -26,6 +26,8 @@ export function hello(): Control {
     joined: [...self.joined],
     coordinator: self.coordinator,
     since: self.since,
+    user: self.user,
+    invitedBy: self.invitedBy,
   }
 }
 

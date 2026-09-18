@@ -37,6 +37,8 @@ const room = openRoom(opts.room, { identity, transport: opts.local ? 'local' : '
 self.id = room.id
 self.home = opts.home
 self.name = opts.name ?? identity.device
+self.user = identity.username
+self.invitedBy = identity.invitedBy
 self.fixedName = opts.name !== null
 
 room.on('connection', onConnection)

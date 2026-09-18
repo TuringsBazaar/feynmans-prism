@@ -4,7 +4,8 @@
 // same answer from the hellos it has seen, so no election traffic is needed.
 // Two pears wearing the same name: the newer one re-rolls and persists.
 
-import { pickDeviceName, saveDevice } from './identity.ts'
+import { pickDeviceName, saveIdentity } from './identity.ts'
+import { absorbBroadcasts } from './restructure.ts'
 import { broadcastControl, hello } from './send.ts'
 import { logEvent, notify, remoteLabel, remotes, self, shortId } from './state.ts'
 
@@ -21,7 +22,7 @@ export function takenNames(): string[] {
 export function rerollName(reason: string) {
   const next = pickDeviceName([self.name, ...takenNames()])
   self.name = next
-  saveDevice(self.home, next)
+  saveIdentity(self.home, { device: next })
   broadcastControl({ t: 'rename', name: next })
   logEvent(`renamed to ${next} (${reason})`)
   notify()
@@ -39,6 +40,7 @@ export function becomeCoordinator(reason: string) {
   self.coordinator = true
   self.coordinatorId = null
   clearHelloGrace()
+  absorbBroadcasts()
   logEvent(`coordinator: ${self.name} (${reason})`)
   broadcastControl(hello())
   notify()

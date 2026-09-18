@@ -43,7 +43,7 @@ export interface Problem {
 }
 
 const q = (text: string): Subproblem => ({ text, tokens: null })
-const PLACEHOLDER: Subproblem[] = [q('Not yet extracted — populate from a future run.')]
+export const PLACEHOLDER: Subproblem[] = [q('Not yet extracted — populate from a future run.')]
 
 export const PROBLEMS: Problem[] = [
   {

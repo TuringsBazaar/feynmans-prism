@@ -1,0 +1,15 @@
+# TLS is automatic (Let's Encrypt) once DNS for adiabatic.garden points here.
+# /join serves the onboarding script; everything else is Headscale, which
+# also needs the HTTP upgrade for /ts2021 that reverse_proxy passes through.
+
+adiabatic.garden {
+	handle /join {
+		root * /srv
+		rewrite * /join.sh
+		file_server
+	}
+
+	handle {
+		reverse_proxy headscale:8080
+	}
+}

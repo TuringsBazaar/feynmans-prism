@@ -3,8 +3,10 @@
 import { Box, Text } from 'ink'
 import type { Problem } from '../data.ts'
 import type { Snapshot } from '../state.ts'
+import { buildTree, flatten, type GraphSnapshot, type TreeNode } from '../tree.ts'
 
-export const KEYS_HELP = '[j/k] move · [space] join/leave · [enter] expand · [m] message · [q] quit'
+export const KEYS_HELP =
+  '[j/k] move · [space] join/leave · [enter] expand · [p] propose · [r] review · [m] message · [q] quit'
 
 function fmtTok(n: number | null | undefined) {
   if (n === null || n === undefined) return '—'
@@ -23,7 +25,10 @@ export function Header({ data }: { data: Snapshot }) {
       <Text>
         {data.online ? 'online' : 'connecting'} · {total} peers{role}
       </Text>
-      <Text>device: {data.name}</Text>
+      <Text>
+        device: {data.name}
+        {data.user ? ` · you: ${data.user}` : ''}
+      </Text>
     </Box>
   )
 }
@@ -44,23 +49,54 @@ export function ProblemRow({ problem, index, data }: { problem: Problem; index: 
           {peersStr} {fmtTok(problem.tokens)} tok
         </Text>
       </Box>
-      {open ? <Subproblems problem={problem} /> : null}
+      {open ? <Subproblems problem={problem} graph={data.graphs[problem.id]} /> : null}
     </Box>
   )
 }
 
-function Subproblems({ problem }: { problem: Problem }) {
+// The coordinator's graph when we have one, else the static list from data.ts.
+function Subproblems({ problem, graph }: { problem: Problem; graph?: GraphSnapshot }) {
   const last = problem.subproblems.length - 1
   return (
     <Box flexDirection="column" paddingLeft={6}>
       <Text dimColor wrap="wrap">
         {problem.statement}
       </Text>
-      {problem.subproblems.map((sub, j) => (
-        <Text key={j} wrap="wrap">
-          {j === last ? '└' : '├'} {sub.text}
+      {graph ? (
+        <Tree graph={graph} />
+      ) : (
+        problem.subproblems.map((sub, j) => (
+          <Text key={j} wrap="wrap">
+            {j === last ? '└' : '├'} {sub.text}
+          </Text>
+        ))
+      )}
+    </Box>
+  )
+}
+
+// ✓ solved · ○ ready · · blocked (a requirement is still open) · ✗ retired
+function glyph(n: TreeNode) {
+  if (n.status === 'solved') return '✓'
+  if (n.status === 'retired') return '✗'
+  return n.ready ? '○' : '·'
+}
+
+function Tree({ graph }: { graph: GraphSnapshot }) {
+  const rows = flatten(buildTree(graph))
+  return (
+    <Box flexDirection="column">
+      {rows.map(({ node, depth, last }) => (
+        <Text key={node.id} wrap="wrap" dimColor={node.status !== 'open' || !node.ready}>
+          {'  '.repeat(depth)}
+          {last ? '└' : '├'} {glyph(node)} {node.id} {node.text}
         </Text>
       ))}
+      {graph.pending.length ? (
+        <Text color="yellow">
+          {graph.pending.length} proposal{graph.pending.length === 1 ? '' : 's'} pending review
+        </Text>
+      ) : null}
     </Box>
   )
 }
@@ -81,7 +117,7 @@ export function Composer({ data }: { data: Snapshot }) {
   if (!data.composing) return <Text dimColor>{KEYS_HELP}</Text>
   return (
     <Text>
-      <Text color="green">{'> '}</Text>
+      <Text color="green">{data.compose === 'propose' ? 'propose> ' : '> '}</Text>
       {data.draft}
       <Text inverse> </Text>
       <Text dimColor> enter send · esc cancel</Text>

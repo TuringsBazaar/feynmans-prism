@@ -8,9 +8,11 @@ import { create } from 'zustand'
 import type { PeerSocket } from './room.ts'
 import type { CoordinatorLedger, PeerMetrics } from './fragments.ts'
 import { initLedger } from './fragments.ts'
+import type { GraphSnapshot } from './tree.ts'
 
 export interface Remote {
   name: string | null
+  user: string | null
   joined: Set<string>
   socket: PeerSocket
   coordinator: boolean
@@ -29,6 +31,8 @@ export const self = {
   home: '', // identity directory; the device name is persisted there
   since: Date.now(), // coordinator election: earlier start wins
   name: '', // device name from identity.json, or --name/--index
+  user: null as string | null, // username from identity.json, once `pnpm join` ran
+  invitedBy: null as string | null,
   fixedName: false, // --name/--index given; never yield it in a collision
   coordinator: false,
   coordinatorId: null as string | null, // peerId of the coordinator, if not us
@@ -37,6 +41,9 @@ export const self = {
 }
 
 export const remotes = new Map<string, Remote>()
+// Problem graphs as last broadcast by the coordinator (the coordinator
+// mirrors its own here too). Keyed by problem id.
+export const graphs = new Map<string, GraphSnapshot>()
 export const feed: FeedEntry[] = []
 const FEED_MAX = 60
 
@@ -52,6 +59,7 @@ export const ui = {
   cursor: 0,
   expanded: new Set<string>(),
   composing: false,
+  compose: 'chat' as 'chat' | 'propose', // what enter does with the draft
   draft: '',
 }
 
@@ -79,6 +87,7 @@ export function peerCounts(): Record<string, number> {
 
 export interface Snapshot {
   name: string
+  user: string | null
   coordinator: boolean
   coordinatorName: string | null
   online: boolean
@@ -92,7 +101,10 @@ export interface Snapshot {
   counts: Record<string, number>
   feed: FeedEntry[]
   composing: boolean
+  compose: 'chat' | 'propose'
   draft: string
+  graphs: Record<string, GraphSnapshot>
+  pending: number // proposals awaiting review, across problems
   peerMetrics?: Record<string, PeerMetrics>
 }
 
@@ -101,33 +113,41 @@ function coordinatorName(): string | null {
   return self.coordinatorId ? remoteLabel(self.coordinatorId) : null
 }
 
+function remoteSnapshots(): Snapshot['remotes'] {
+  return Object.fromEntries(
+    [...remotes].map(([rid, r]) => {
+      const metrics = coordinatorLedger?.peerMetrics.get(rid)
+      return [
+        rid,
+        {
+          name: r.name,
+          joined: [...r.joined],
+          solveVelocity: metrics?.solveVelocity,
+          avgAmplification: metrics?.avgAmplificationFactor,
+        },
+      ]
+    }),
+  )
+}
+
 export function derive(): Snapshot {
   const snap: Snapshot = {
     name: self.name,
+    user: self.user,
     coordinator: self.coordinator,
     coordinatorName: coordinatorName(),
     online: self.online,
     cursor: ui.cursor,
     expanded: [...ui.expanded],
     selfJoined: [...self.joined],
-    remotes: Object.fromEntries(
-      [...remotes].map(([rid, r]) => {
-        const metrics = coordinatorLedger?.peerMetrics.get(rid)
-        return [
-          rid,
-          {
-            name: r.name,
-            joined: [...r.joined],
-            solveVelocity: metrics?.solveVelocity,
-            avgAmplification: metrics?.avgAmplificationFactor,
-          },
-        ]
-      }),
-    ),
+    remotes: remoteSnapshots(),
     counts: peerCounts(),
     feed: [...feed],
     composing: ui.composing,
+    compose: ui.compose,
     draft: ui.draft,
+    graphs: Object.fromEntries(graphs),
+    pending: [...graphs.values()].reduce((n, g) => n + g.pending.length, 0),
   }
   if (self.coordinator && coordinatorLedger) {
     snap.peerMetrics = Object.fromEntries(coordinatorLedger.peerMetrics)

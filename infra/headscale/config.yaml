@@ -1,0 +1,59 @@
+# Headscale v0.29 config for adiabatic.garden. Only the keys that differ from
+# config-example.yaml are worth a comment; the rest are its defaults.
+
+server_url: https://adiabatic.garden
+listen_addr: 0.0.0.0:8080 # Caddy terminates TLS and proxies here
+metrics_listen_addr: 127.0.0.1:9090
+grpc_listen_addr: 127.0.0.1:50443
+grpc_allow_insecure: false
+
+noise:
+  private_key_path: /var/lib/headscale/noise_private.key
+
+prefixes:
+  v4: 100.64.0.0/10
+  v6: fd7a:115c:a1e0::/48
+  allocation: sequential
+
+derp:
+  server:
+    enabled: false
+  # Tailscale's public relays: a pear behind a hostile NAT still connects.
+  urls:
+    - https://controlplane.tailscale.com/derpmap/default
+  paths: []
+  auto_update_enabled: true
+  update_frequency: 3h
+
+disable_check_updates: true
+
+node:
+  ephemeral_inactivity_timeout: 30m
+
+database:
+  type: sqlite
+  sqlite:
+    path: /var/lib/headscale/db.sqlite
+    write_ahead_log: true
+
+tls_cert_path: ''
+tls_key_path: ''
+
+log:
+  format: text
+  level: info
+
+policy:
+  mode: database
+
+dns:
+  magic_dns: true
+  # Must not be the server_url host itself; devices become <device>.pears.adiabatic.garden.
+  base_domain: pears.adiabatic.garden
+  nameservers:
+    global:
+      - 1.1.1.1
+      - 1.0.0.1
+
+unix_socket: /var/run/headscale/headscale.sock
+unix_socket_permission: '0770'
