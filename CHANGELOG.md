@@ -3,6 +3,98 @@
 Newest first, start with yyyy-mm-dd in title
 
 
+## 2026-09-18 — Changing Shores: Ovid panel, shapes anywhere, music always
+
+- Music (`public/music/ambience.mp3`, user-supplied) loops from the first
+  input; the procedural wind/water/rumble beds are gone (`audio.ts` keeps only
+  the memory chime). The seaside/zoom cue is gone with them.
+- Upper-left panel shows only the place name and one line from Ovid's
+  *Metamorphoses* in A. S. Kline's translation (fetched verbatim from
+  poetryintranslation.com: Nonacris Bk II, Parnassus Bk I, Thebes Bk III,
+  Corinth/Ephyre Bk VII, Crete/Daedalus Bk VIII, Lesbos/Orpheus Bk XI;
+  Eridanus Bk II for the open sea), with attribution. No objectives or hints.
+- Q changes shape anywhere: land cycles human → stag → owl, water cycles
+  naiad ↔ owl. Entering water as a walker makes a naiad, leaving makes a
+  human. Shrines stay as landmarks; no unlocking, no `unlocked` in saves.
+- Upper-right chips (memories, form) removed.
+
+## 2026-09-18 — Changing Shores: Blender mouse scheme
+
+- Middle button + drag orbits, Shift + middle drag pans, Ctrl + middle drag
+  zooms (as does the wheel); the left button no longer touches the camera.
+  Shift held for a pan does not count as "descend". Help bar and README updated.
+
+## 2026-09-18 — Changing Shores: camera-relative steering, seaside ambience
+
+- Drag-to-look felt wrong because the heading stayed put: after looking
+  sideways, W walked sideways while the view swung back. Now walking forward
+  adopts the look direction every frame (`FollowCamera.takeYaw`), so a drag
+  while walking steers and a drag while standing orbits. Pan still eases out.
+- `music.ts`: one looping ambience (`public/music/seaside.mp3`, user-supplied,
+  not bundled) fading in when sea is within 45 m or the camera is far out /
+  high (`zoom > 2.2` or `pitch > 0.7`). Starts on the first input gesture;
+  a missing file stays silent.
+
+## 2026-09-18 — Changing Shores: camera controls and the Cloudline look
+
+- Camera (`camera.ts`, out of engine.ts): left-drag looks around the player,
+  wheel-button drag pans, scroll zooms (0.35×–3.5×). Look and pan ease back
+  behind the player once you move; pitch and zoom stay. `controls.ts` owns
+  the mouse (preventing middle-click autoscroll and the context menu).
+- Style reverse-engineered from `site/src/assets/reference*.png`: golden-hour
+  gradient dome, soft sun sprite that shrinks to a moon with stars at the
+  owl's dusk, 26 drifting low-poly clouds, sea sparkle points, Neutral tone
+  mapping, warm key + lavender hemisphere + soft shadows (`sky.ts`). Palette:
+  sage-lime meadows, lavender-grey rock, pale turquoise water; cream walls,
+  terracotta roofs with ridge and chimney, dark-green shutters, emissive
+  windows; round sage canopies; lamp posts; lighthouses at Corinth and Thrace.
+  Tracks get two rails, instanced sleepers and trestle legs where the line
+  leaves the ground; the cart is tram green with cream trim and a lantern
+  (`track.ts`). `props.ts` split into builders + `dress.ts` (region dressing).
+- HUD in ivory rounded panels: small-caps labels, serif region name, chips
+  for memories and form, Power/Brake pedals with key hints in carts, help bar
+  with the mouse controls (`App.css`, `hud.tsx`).
+
+## 2026-09-18 — Changing Shores: the low-poly game in `site/`
+
+From `visual-design.md`, built into the existing Vite + React scaffold (no
+extra package): `three` 0.186 added with pnpm, `App.tsx` is the shell,
+`hud.tsx` the overlay, `src/game/` the engine, all under the 35/300 limits
+(`.oxlintrc.json` now enforces them for the site too).
+
+- World: one height function (`terrain.ts`) from region blobs, carved by two
+  rivers, seven pools, the Corinth isthmus (two seas) and a strait that makes
+  Crete an island; flat-shaded non-indexed mesh, vertex colours by height and
+  region tint. Six regions dressed procedurally (`props.ts`): pines, olives,
+  cypresses, houses, Delphi's terrace and columns, Thebes' walls with gates,
+  Corinth's piers, Daedalus' workshop; islets Delos, Paros, Icaria; Lesbos.
+- Forms (`player.ts`): human (walk, jump), stag (fast, springy, high jump),
+  owl (free flight, bank, glide sink, thermals on the Icarian route, dusk
+  atmosphere and drifting seeds), naiad (swim in sea and pools, dive, surface).
+  Non-naiads float slowly; naiads crawl on land; nobody is stranded. Fall
+  recovery to the last solid footing.
+- Carts (`cart.ts`): Catmull-Rom tracks at Nonacris and Corinth, arc-length
+  lookup, W/S accel/brake, slope pull, drag, cornering roll; ride toward the
+  far end from whichever end you board.
+- Interactions (`interactions.ts`): talk (names from `src/names.ts`, the old
+  pear names), board carts, follow springs (submerged passages between twin
+  pools), transform at springs/shrines/groves/pools (unlock + cycle).
+- Memories: one per region gated by a form (Ladon's hidden pool → naiad,
+  Delphi ledge → owl, Cithaeron → stag trail, Acrocorinth → cart, Icaria →
+  thermals, Mytilene → river to sea). Six found reveals Eridanus
+  (`eridanus.ts`), a luminous sky tube; its source completes the journey.
+- HUD/React: region, form, objective, memories, contextual E/Q prompt,
+  dialogue, cart gauge, map (`M`, top-down raster of the height function),
+  restart, touch joystick + buttons on coarse pointers. Procedural audio
+  (`audio.ts`) starts on first input. Local save every 5 s and on pickups.
+- Verified: `tsc -b`, oxlint, `vite build` clean; Node logic smoke of every
+  region/memory/pool/track and all four forms; headless Chromium render with
+  zero console errors (screenshot of Nonacris). Fixed on the way: carts
+  reversed at the midpoint; Crete was joined to Corinth by land; Three r186
+  deprecations (`Clock` → `Timer`, `PCFSoftShadowMap`).
+- Left: `site/package-lock.json` from the npm scaffold is stale next to
+  `pnpm-lock.yaml`; delete it. Optional dolphin and cart customisation not built.
+
 ## 2026-09-18 — feynman.network/join: Headscale, invites, usernames
 
 - `infra/headscale/`: `compose.yaml` (headscale 0.29.3 + caddy), `config.yaml`

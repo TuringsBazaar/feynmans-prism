@@ -1,0 +1,246 @@
+:root {
+  --ivory: rgba(246, 242, 232, 0.92);
+  --ivory-line: rgba(47, 58, 48, 0.14);
+  --ink: #2f3a30;
+  --ink-soft: #6f7a6a;
+  --olive: #3f5a45;
+  --gold: #c9a75a;
+  --serif: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Georgia, 'Times New Roman', serif;
+  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --shadow: 0 10px 30px rgba(40, 30, 50, 0.12), 0 2px 6px rgba(40, 30, 50, 0.06);
+}
+
+.game {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #e6cfc6;
+  color: var(--ink);
+  font: 15px/1.4 var(--sans);
+  user-select: none;
+}
+
+.canvas,
+.canvas canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.panel {
+  background: var(--ivory);
+  border: 1px solid var(--ivory-line);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(6px);
+}
+
+.label {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.status {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  padding: 16px 20px;
+  max-width: min(400px, calc(100vw - 40px));
+}
+
+.region {
+  font: 600 30px/1.1 var(--serif);
+  color: var(--olive);
+  margin: 4px 0 8px;
+}
+
+.ovid {
+  font: 16px/1.45 var(--serif);
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+
+.prompt {
+  position: absolute;
+  left: 50%;
+  bottom: 110px;
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  white-space: nowrap;
+}
+
+kbd {
+  display: inline-block;
+  min-width: 22px;
+  padding: 1px 6px;
+  margin-right: 8px;
+  border: 1px solid var(--ivory-line);
+  border-radius: 6px;
+  text-align: center;
+  font: 13px var(--sans);
+  color: var(--olive);
+  background: #fff;
+}
+
+.dialogue {
+  position: absolute;
+  left: 50%;
+  bottom: 160px;
+  transform: translateX(-50%);
+  max-width: min(560px, calc(100vw - 40px));
+  padding: 12px 18px;
+  font-family: var(--serif);
+  font-size: 17px;
+}
+
+.dialogue b {
+  color: var(--olive);
+  font-weight: 600;
+}
+
+.cart {
+  position: absolute;
+  right: 20px;
+  bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.speed {
+  padding: 8px 16px;
+  font: 600 30px/1 var(--sans);
+  color: var(--olive);
+  font-variant-numeric: tabular-nums;
+}
+
+.speed small {
+  font-size: 12px;
+  margin-left: 4px;
+  color: var(--ink-soft);
+}
+
+.pedal {
+  padding: 10px 16px;
+  min-width: 110px;
+  border-radius: 14px;
+  border: 1px solid var(--ivory-line);
+  background: var(--ivory);
+  color: var(--ink);
+}
+
+.pedal.power {
+  background: var(--olive);
+  color: #f6f2e8;
+  border-color: var(--olive);
+}
+
+.pedal.brake.on {
+  background: #d4835a;
+  color: #fff;
+  border-color: #d4835a;
+}
+
+.pedal .label {
+  color: inherit;
+  opacity: 0.75;
+}
+
+.map {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(70vmin, 512px);
+  height: min(70vmin, 512px);
+  transform: translate(-50%, -50%);
+  image-rendering: pixelated;
+  border: 6px solid var(--ivory);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+}
+
+.notice {
+  position: absolute;
+  right: 20px;
+  bottom: 24px;
+}
+
+.notice.shifted {
+  bottom: 88px;
+}
+
+.notice button,
+.buttons button {
+  font: 14px var(--sans);
+  color: var(--olive);
+  background: var(--ivory);
+  border: 1px solid var(--ivory-line);
+  border-radius: 12px;
+  padding: 8px 14px;
+  box-shadow: var(--shadow);
+}
+
+.help {
+  position: absolute;
+  left: 20px;
+  bottom: 24px;
+  padding: 8px 14px;
+  font-size: 12px;
+  color: var(--ink-soft);
+  letter-spacing: 0.04em;
+}
+
+.help kbd {
+  margin-right: 4px;
+}
+
+.mobile {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  .help {
+    display: none;
+  }
+
+  .mobile {
+    display: block;
+  }
+
+  .joystick {
+    position: absolute;
+    left: 24px;
+    bottom: 48px;
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    border: 2px solid var(--ivory);
+    background: rgba(246, 242, 232, 0.35);
+    touch-action: none;
+  }
+
+  .buttons {
+    position: absolute;
+    right: 16px;
+    bottom: 56px;
+    display: grid;
+    grid-template-columns: repeat(2, 56px);
+    gap: 10px;
+  }
+
+  .buttons button {
+    height: 56px;
+    font-size: 18px;
+    touch-action: none;
+  }
+
+  .notice,
+  .cart {
+    bottom: auto;
+    top: 80px;
+  }
+}

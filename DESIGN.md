@@ -138,6 +138,12 @@ check top peers: in terms of work
 versions:
 - v0: can use pear/hyperswarm as referenced in https://github.com/exanova-y/pear-to-pear to commuincate. see guillefix.cjs
 stack
+- v1: for friends to use. connect to a tailnet and exchange compute 
+- vn: use reticulum network
+
+things to do:
+- local connectivity tests. check why the devices aren't connecting. also allow multiple terminals per device basically one node can send multiple agents
+- investigate darkbloom.dev
 
 roadmap:
 - reticulum for networking with other feynmans, which is device agnostic and beautiful

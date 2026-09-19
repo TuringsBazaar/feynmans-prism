@@ -93,6 +93,7 @@ Run from the repo root. Room commands take `--room <name>` to select a room.
 | `pnpm -C torrent propose -- <problemId> "<text>" [--parent q3] [--room r]` | propose a subproblem; it waits in the coordinator's review queue |
 | `pnpm -C torrent review -- [--approve all\|1,2] [--reject 3] [--room r]` | list the queue, or settle a batch of it |
 | `pnpm -C torrent check` | `lint` (oxlint + prettier) · `typecheck` · `test` |
+| `pnpm -C site dev` · `pnpm -C site build` · `pnpm -C site lint` | Changing Shores, the low-poly Three.js game and visuals site ([site/README.md](site/README.md)) |
 | `uv sync` | Python deps for `graphs/` and `tools/` |
 | `uv run helm-mirror run` | evaluate feynman research runs, HELM-style ([design](tools/helm_mirror/design.md)) |
 | `just ingest` | gate: paper dumps → postgres `papers` table (needs `DATABASE_URL`) |
@@ -286,6 +287,7 @@ torrent/        the pear: p2p client over loopback / tailscale (TypeScript, Ink)
   src/          wire · identity · invite · headscale · transport · room · state · send · presence · naming · peer · lifecycle · ui/ · pear.tsx (entry) · discord/ (wip, hyperswarm)
   scripts/      join · invite · orchestrator · message · transcript · agent · guillefix.cjs
 infra/headscale/  adiabatic.garden: Headscale + Caddy compose, config, and the /join script
+site/           Changing Shores: Vite + React shell, src/game/ Three.js engine (visual-design.md)
   tests/        node:test over the pure modules (wire, room, naming)
 autoresearch/   vendored feynman autoresearch
 tools/          helm_mirror (evaluator) · research (SQLite research tree) · instructions · outputs/ (untracked)
